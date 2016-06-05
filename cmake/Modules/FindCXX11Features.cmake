@@ -35,18 +35,25 @@ include(CheckIncludeFileCXX)
 include(AddOptions)
 
 # try to use compiler flag -std=c++11
-CHECK_CXX_ACCEPTS_FLAG("-std=c++11" CXX_FLAG_CXX11)
-if(CXX_FLAG_CXX11)
-  add_options (CXX ALL_BUILDS "-std=c++11")
-  set(CXX_STD0X_FLAGS "-std=c++11")
+CHECK_CXX_ACCEPTS_FLAG("-std=c++14" CXX_FLAG_CXX14)
+if(CXX_FLAG_CXX14)
+  add_options (CXX ALL_BUILDS "-std=c++14")
+  set(CXX_STD0X_FLAGS "-std=c++14")
 else()
-  # try to use compiler flag -std=c++0x for older compilers
-  CHECK_CXX_ACCEPTS_FLAG("-std=c++0x" CXX_FLAG_CXX0X)
-  if(CXX_FLAG_CXX0X)
-  add_options (CXX ALL_BUILDS "-std=c++0x")
-  set(CXX_STD0X_FLAGS "-std=c++0x")
-  endif(CXX_FLAG_CXX0X)
-endif(CXX_FLAG_CXX11)
+  # try to use compiler flag -std=c++11
+  CHECK_CXX_ACCEPTS_FLAG("-std=c++11" CXX_FLAG_CXX11)
+  if(CXX_FLAG_CXX11)
+    add_options (CXX ALL_BUILDS "-std=c++11")
+    set(CXX_STD0X_FLAGS "-std=c++11")
+  else()
+    # try to use compiler flag -std=c++0x for older compilers
+    CHECK_CXX_ACCEPTS_FLAG("-std=c++0x" CXX_FLAG_CXX0X)
+    if(CXX_FLAG_CXX0X)
+    add_options (CXX ALL_BUILDS "-std=c++0x")
+    set(CXX_STD0X_FLAGS "-std=c++0x")
+    endif(CXX_FLAG_CXX0X)
+  endif(CXX_FLAG_CXX11)
+endif(CXX_FLAG_CXX14)
 
 # if we are building with an Apple toolchain in MacOS X,
 # we cannot use the old GCC 4.2 fork, but must use the
@@ -187,7 +194,7 @@ CHECK_CXX_SOURCE_COMPILES("
 # array and fill
 CHECK_CXX_SOURCE_COMPILES("
     #include <array>
-    
+
     int main(void)
     {
       std::array<int,2> a;
@@ -242,24 +249,24 @@ CHECK_CXX_SOURCE_COMPILES("
    {
      bar() DEP;
    };
-   
+
    class peng { } DEP;
-   
+
    template <class T>
    class t_bar
    {
      t_bar() DEP;
    };
-   
+
    template <class T>
    class t_peng {
      t_peng() {};
    } DEP;
-   
+
    void foo() DEP;
-   
+
    void foo() {};
-   
+
    int main(void)
    {
      return 0;
@@ -273,25 +280,25 @@ CHECK_CXX_SOURCE_COMPILES("
    class bar {
      bar() DEP;
    };
-   
+
    class peng { } DEP;
-   
+
    template <class T>
    class t_bar
    {
      t_bar() DEP;
    };
-   
+
    template <class T>
    class t_peng
    {
-     t_peng() {}; 
+     t_peng() {};
    } DEP;
-   
+
    void foo() DEP;
-   
+
    void foo() {};
-   
+
    int main(void)
    {
      return 0;

@@ -37,7 +37,7 @@ endif (CMAKE_VERSION VERSION_LESS "2.8.3")
 if (CMAKE_VERSION VERSION_LESS "2.8.5")
 	message (STATUS "Enabling compatibility modules for CMake 2.8.5")
 	list (APPEND CMAKE_MODULE_PATH "${OPM_MACROS_ROOT}/cmake/Modules/compat-2.8.5")
-endif (CMAKE_VERSION VERSION_LESS "2.8.5")	
+endif (CMAKE_VERSION VERSION_LESS "2.8.5")
 
 if (CMAKE_VERSION VERSION_LESS "2.8.7")
 	message (STATUS "Enabling compatibility modules for CMake 2.8.7")
@@ -53,6 +53,8 @@ project (${${project}_NAME})
 enable_language (C)
 enable_language (CXX)
 
+include(OverloadCompilerFlags)
+
 # print system information to better pinpoint issues from log alone
 include (UseSystemInfo)
 system_info ()
@@ -65,6 +67,9 @@ vcs_info ()
 include (UseCompVer)
 compiler_info ()
 linker_info ()
+
+# if overloading of CXXFLAGS is desired, start this process here
+initialize_compiler_script()
 
 # default settings: build static debug library
 include (OpmDefaults)
@@ -276,7 +281,6 @@ include (OpmDoc)
 opm_doc (${project} ${doxy_dir})
 
 # provide compatibility with using this build in dunecontrol
-include (DuneCompat)
 include (LibtoolArchives)
 if (${project}_TARGET)
 	configure_la (${project} ${${project}_TARGET} ${project}_LIBTOOL_ARCHIVE)
@@ -301,3 +305,6 @@ include (UseVersion)
 
 # update the cache for next run
 write_back_options ()
+
+# finalize compiler script if enabled
+finalize_compiler_script()
