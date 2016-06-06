@@ -5,6 +5,7 @@
 set (opm-simulators_CONFIG_VAR
 	HAVE_OPM_GRID
 	HAVE_PTHREAD
+	HAVE_EWOMS
 	)
 
 # dependencies
