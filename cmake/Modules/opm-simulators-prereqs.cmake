@@ -21,10 +21,11 @@ set (opm-simulators_DEPS
 	dune-istl REQUIRED"
 	# OPM dependency
 	"opm-common REQUIRED;
-        opm-parser REQUIRED;
+   opm-parser REQUIRED;
 	opm-core REQUIRED;
 	opm-output REQUIRED;
-	opm-grid"
+	opm-grid REQUIRED;
+	ewoms REQUIRED"
 	# Eigen
 	"Eigen3 3.2.0"
 	)
