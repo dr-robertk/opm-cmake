@@ -14,6 +14,7 @@ set (polygonal-fv_CONFIG_VAR
   HAVE_DUNE_LOCALFUNCTIONS
   HAVE_DUNE_ISTL
   HAVE_DUNE_ALUGRID
+	HAVE_DUNE_POLYGONGRID
   HAVE_DUNE_FEM
   DUNE_AVOID_CAPABILITIES_IS_PARALLEL_DEPRECATION_WARNING
   )
@@ -28,5 +29,6 @@ set (polygonal-fv_DEPS
 	"dune-grid REQUIRED"
 	"dune-fem REQUIRED"
 	"dune-alugrid"
+	"dune-polygongrid"
 	"opm-grid"
 	)
