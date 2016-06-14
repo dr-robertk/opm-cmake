@@ -15,7 +15,7 @@ find_opm_package (
   "dune/polygongrid/grid.hh"
 
   # library to search for
-  "dunepolygongrid"
+  ""
 
   # defines to be added to compilations
   ""
