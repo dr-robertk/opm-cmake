@@ -35,7 +35,7 @@ namespace Log {
     std::string fileMessage(const std::string& filename , int line , const std::string& message) {
         std::ostringstream oss;
 
-        oss << filename << ":" << line << ": " << message;
+        oss << message << "\n" << "In file " << filename << ", line " << line << "\n";
 
         return oss.str();
     }
@@ -49,22 +49,25 @@ namespace Log {
         std::string prefix;
         switch (messageType) {
         case MessageType::Debug:
-            prefix = "debug";
+            prefix = "Debug";
+            break;
+        case MessageType::Note:
+            prefix = "Note";
             break;
         case MessageType::Info:
-            prefix = "info";
+            prefix = "Info";
             break;
         case MessageType::Warning:
-            prefix = "warning";
+            prefix = "Warning";
             break;
         case MessageType::Error:
-            prefix = "error";
+            prefix = "Error";
             break;
         case MessageType::Problem:
-            prefix = "problem";
+            prefix = "Problem";
             break;
         case MessageType::Bug:
-            prefix = "bug";
+            prefix = "Bug";
             break;
         default:
             throw std::invalid_argument("Unhandled messagetype");
@@ -77,6 +80,7 @@ namespace Log {
     std::string colorCodeMessage(int64_t messageType, const std::string& message) {
         switch (messageType) {
         case MessageType::Debug:
+        case MessageType::Note:
         case MessageType::Info:
             return message; // No color coding, not even the code for default color.
         case MessageType::Warning:
