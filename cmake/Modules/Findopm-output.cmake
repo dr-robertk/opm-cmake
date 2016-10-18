@@ -30,9 +30,8 @@ find_opm_package (
   ""
 
   # test program
-"#include <opm/output/Wells.hpp>
+"#include <opm/output/eclipse/Summary.hpp>
 int main (void) {
-    Opm::data::Rates r;
     return 0;
 }
 "
@@ -45,14 +44,10 @@ include (UseDynamicBoost)
 
 if(OPM_OUTPUT_FOUND)
   get_filename_component(opm-output_PREFIX_DIR ${opm-output_LIBRARY} PATH)
-  find_program(SUMMARY_REGRESSION_TEST_COMMAND summaryRegressionTest
+  find_program(COMPARE_SUMMARY_COMMAND compareSummary
                PATHS ${opm-output_PREFIX_DIR}/../bin
                      ${opm-output_PREFIX_DIR}/../../bin)
-  find_program(RESTART_REGRESSION_TEST_COMMAND restartRegressionTest
-               PATHS ${opm-output_PREFIX_DIR}/../bin
-                     ${opm-output_PREFIX_DIR}/../../bin)
-
-  find_program(INIT_REGRESSION_TEST_COMMAND initRegressionTest
+  find_program(COMPARE_ECL_COMMAND compareECL
                PATHS ${opm-output_PREFIX_DIR}/../bin
                      ${opm-output_PREFIX_DIR}/../../bin)
 
