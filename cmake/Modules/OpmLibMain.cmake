@@ -289,6 +289,7 @@ include (OpmDoc)
 opm_doc (${project} ${doxy_dir})
 
 # provide compatibility with using this build in dunecontrol
+include (DuneCompat)
 include (LibtoolArchives)
 if (${project}_TARGET)
 	configure_la (${project} ${${project}_TARGET} ${project}_LIBTOOL_ARCHIVE)
