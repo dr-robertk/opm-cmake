@@ -58,12 +58,12 @@ namespace {
       The RestartValue structure has an 'extra' container which can be used to
       add extra fields to the restart file. The extra field is used both to add
       OPM specific fields like 'OPMEXTRA', and eclipse standard fields like
-      THPRESPR. In the case of e.g. THPRESPR this should - if present - be added
+      THRESHPR. In the case of e.g. THRESHPR this should - if present - be added
       in the SOLUTION section of the restart file. The std::set extra_solution
       just enumerates the keys which should be in the solution section.
     */
 
-    static const std::set<std::string> extra_solution = {"THPRESPR"};
+    static const std::set<std::string> extra_solution = {"THRESHPR"};
 
 
 
@@ -206,7 +206,7 @@ data::Wells restore_wells( const ecl_kw_type * opm_xwel,
 
         for( const auto& sc : sched_well->getConnections( sim_step ) ) {
             const auto i = sc.getI(), j = sc.getJ(), k = sc.getK();
-            if( !grid.cellActive( i, j, k ) || sc.state == WellCompletion::SHUT ) {
+            if( !grid.cellActive( i, j, k ) || sc.state() == WellCompletion::SHUT ) {
                 opm_xwel_data += data::Connection::restart_size + phases.size();
                 continue;
             }
@@ -252,6 +252,10 @@ RestartValue load( const std::string& filename,
                                       + std::to_string( report_step ) + "!" );
     } else
         file_view = ecl_file_get_global_view( file.get() );
+
+    if (!ecl_file_view_has_kw(file_view, "OPM_XWEL"))
+        throw std::runtime_error("Sorry - this file is missing the OPM_XWEL keyword - required for flow based restart\n");
+
 
     const ecl_kw_type * intehead = ecl_file_view_iget_named_kw( file_view , "INTEHEAD", 0 );
     const ecl_kw_type * opm_xwel = ecl_file_view_iget_named_kw( file_view , "OPM_XWEL", 0 );
@@ -310,10 +314,10 @@ std::vector<int> serialize_ICON( int sim_step,
             data[ offset + ICON_I_INDEX ] = connection.getI() + 1;
             data[ offset + ICON_J_INDEX ] = connection.getJ() + 1;
             data[ offset + ICON_K_INDEX ] = connection.getK() + 1;
-            data[ offset + ICON_DIRECTION_INDEX ] = connection.dir;
+            data[ offset + ICON_DIRECTION_INDEX ] = connection.dir();
             {
                 const auto open = WellCompletion::StateEnum::OPEN;
-                data[ offset + ICON_STATUS_INDEX ] = connection.state == open
+                data[ offset + ICON_STATUS_INDEX ] = connection.state() == open
                     ? 1
                     : 0;
             }
@@ -408,7 +412,7 @@ std::vector< double > serialize_OPM_XWEL( const data::Wells& wells,
             const auto i = sc.getI(), j = sc.getJ(), k = sc.getK();
 
             const auto rs_size = phases.size() + data::Connection::restart_size;
-            if( !grid.cellActive( i, j, k ) || sc.state == WellCompletion::SHUT ) {
+            if( !grid.cellActive( i, j, k ) || sc.state() == WellCompletion::SHUT ) {
                 xwel.insert( xwel.end(), rs_size, 0.0 );
                 continue;
             }
@@ -554,16 +558,20 @@ void writeWell(ecl_rst_file_type* rst_file, int sim_step, const EclipseState& es
     const auto& phases = es.runspec().phases();
     const size_t ncwmax = schedule.getMaxNumConnectionsForWells(sim_step);
 
-    const auto opm_xwel  = serialize_OPM_XWEL( wells, sim_step, sched_wells, phases, grid );
-    const auto opm_iwel  = serialize_OPM_IWEL( wells, sched_wells );
     const auto iwel_data = serialize_IWEL(sim_step, sched_wells, grid);
     const auto icon_data = serialize_ICON(sim_step , ncwmax, sched_wells, grid);
     const auto zwel_data = serialize_ZWEL( sched_wells );
 
     write_kw( rst_file, ERT::EclKW< int >( IWEL_KW, iwel_data) );
     write_kw( rst_file, ERT::EclKW< const char* >(ZWEL_KW, zwel_data ) );
-    write_kw( rst_file, ERT::EclKW< double >( OPM_XWEL, opm_xwel ) );
-    write_kw( rst_file, ERT::EclKW< int >( OPM_IWEL, opm_iwel ) );
+
+    if (!es.getIOConfig().getEclCompatibleRST()) {
+        const auto opm_xwel  = serialize_OPM_XWEL( wells, sim_step, sched_wells, phases, grid );
+        const auto opm_iwel  = serialize_OPM_IWEL( wells, sched_wells );
+        write_kw( rst_file, ERT::EclKW< double >( OPM_XWEL, opm_xwel ) );
+        write_kw( rst_file, ERT::EclKW< int >( OPM_IWEL, opm_iwel ) );
+    }
+
     write_kw( rst_file, ERT::EclKW< int >( ICON_KW, icon_data ) );
 }
 
@@ -580,13 +588,13 @@ void checkSaveArguments(const EclipseState& es,
       // If the the THPRES option is active the restart_value should have a
       // THPRES field. This is not enforced here because not all the opm
       // simulators have been updated to include the THPRES values.
-      if (!restart_value.hasExtra("THPRESPR")) {
+      if (!restart_value.hasExtra("THRESHPR")) {
           OpmLog::warning("This model has THPRES active - should have THPRES as part of restart data.");
           return;
       }
 
       size_t num_regions = es.getTableManager().getEqldims().getNumEquilRegions();
-      const auto& thpres = restart_value.getExtra("THPRESPR");
+      const auto& thpres = restart_value.getExtra("THRESHPR");
       if (thpres.size() != num_regions * num_regions)
           throw std::runtime_error("THPRES vector has invalid size - should have num_region * num_regions.");
   }
@@ -605,6 +613,7 @@ void save(const std::string& filename,
 {
     checkSaveArguments(es, value, grid);
     {
+        bool ecl_compatible_rst = es.getIOConfig().getEclCompatibleRST();
         int sim_step = std::max(report_step - 1, 0);
         int ert_phase_mask = es.runspec().eclPhaseMask( );
         const auto& units = es.getUnits();
@@ -617,6 +626,9 @@ void save(const std::string& filename,
         else
             rst_file.reset( ecl_rst_file_open_write( filename.c_str() ) );
 
+        if (ecl_compatible_rst)
+            write_double = false;
+
         // Convert solution fields and extra values from SI to user units.
         value.solution.convertFromSI(units);
         for (auto & extra_value : value.extra) {
@@ -628,8 +640,9 @@ void save(const std::string& filename,
 
         writeHeader( rst_file.get(), sim_step, report_step, posix_time , sim_time, ert_phase_mask, units, schedule , grid );
         writeWell( rst_file.get(), sim_step, es , grid, schedule, value.wells);
-        writeSolution( rst_file.get(), value, write_double );
-        writeExtraData( rst_file.get(), value.extra );
+        writeSolution( rst_file.get(), value, write_double);
+        if (!ecl_compatible_rst)
+            writeExtraData( rst_file.get(), value.extra );
     }
 }
 }
