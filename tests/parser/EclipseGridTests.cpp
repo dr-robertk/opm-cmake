@@ -23,10 +23,14 @@
 #include <cstdio>
 #include <numeric>
 
+
 #define BOOST_TEST_MODULE EclipseGridTests
 #include <boost/test/unit_test.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 
+#include <ert/util/test_work_area.h>
+
+#include <opm/parser/eclipse/Units/UnitSystem.hpp>
 #include <opm/parser/eclipse/Deck/Deck.hpp>
 #include <opm/parser/eclipse/Deck/DeckKeyword.hpp>
 #include <opm/parser/eclipse/Deck/Section.hpp>
@@ -127,6 +131,11 @@ BOOST_AUTO_TEST_CASE(CreateGridNoCells) {
     BOOST_CHECK_EQUAL( 10 , grid.getNX());
     BOOST_CHECK_EQUAL( 10 , grid.getNY());
     BOOST_CHECK_EQUAL( 10 , grid.getNZ());
+
+    BOOST_CHECK_EQUAL(10, grid[0]);
+    BOOST_CHECK_EQUAL(10, grid[2]);
+    BOOST_CHECK_THROW( grid[10], std::invalid_argument);
+
     BOOST_CHECK_EQUAL( 1000 , grid.getCartesianSize());
 }
 
@@ -780,7 +789,29 @@ BOOST_AUTO_TEST_CASE(ConstructorNORUNSPEC) {
     BOOST_CHECK(grid1.equal( grid2 ));
 }
 
+BOOST_AUTO_TEST_CASE(GDFILE) {
+    const char* gdfile_deck =
+        "GRID\n"
+        "GDFILE\n"
+        "'grid/CASE.EGRID' /\n"
+        "\n";
 
+    Opm::EclipseGrid grid1(createCPDeck());
+    test_work_area_type * work_area = test_work_area_alloc("GDFILE");
+    util_mkdir_p("ecl/grid");
+    grid1.save("ecl/grid/CASE.EGRID", Opm::UnitSystem::UnitType::UNIT_TYPE_METRIC);
+    {
+        FILE * stream = fopen("ecl/DECK.DATA", "w");
+        fputs(gdfile_deck, stream);
+        fclose(stream);
+    }
+    {
+        Opm::Parser parser;
+        Opm::EclipseGrid grid2(parser.parseFile("ecl/DECK.DATA", Opm::ParseContext() ));
+        BOOST_CHECK(grid1.equal(grid2));
+    }
+    test_work_area_free( work_area );
+}
 
 BOOST_AUTO_TEST_CASE(ConstructorNoSections) {
     const char* deckData =

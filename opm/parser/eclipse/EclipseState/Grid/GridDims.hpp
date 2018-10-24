@@ -42,6 +42,7 @@ namespace Opm {
 
         size_t getNY() const;
         size_t getNZ() const;
+        size_t operator[](int dim) const;
 
         const std::array<int, 3> getNXYZ() const;
 
@@ -64,6 +65,7 @@ namespace Opm {
 
     private:
         void init(const DeckKeyword& keyword);
+        void binary_init(const Deck& deck);
     };
 }
 

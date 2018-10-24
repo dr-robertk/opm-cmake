@@ -33,13 +33,14 @@
 
 namespace Opm {
 
-    Well::Well(const std::string& name_, int headI,
+    Well::Well(const std::string& name_, const size_t& seqIndex_, int headI,
                int headJ, double refDepth , Phase preferredPhase,
                const TimeMap& timeMap, size_t creationTimeStep,
                WellCompletion::CompletionOrderEnum completionOrdering,
                bool allowCrossFlow, bool automaticShutIn)
         : m_creationTimeStep( creationTimeStep ),
           m_name( name_ ),
+          m_seqIndex( seqIndex_),
           m_status( timeMap, WellCommon::SHUT ),
           m_isAvailableForGroupControl( timeMap, true ),
           m_guideRate( timeMap, -1.0 ),
@@ -72,6 +73,10 @@ namespace Opm {
 
     const std::string& Well::name() const {
         return m_name;
+    }
+
+        const size_t& Well::seqIndex() const {
+        return m_seqIndex;
     }
 
 
@@ -335,7 +340,7 @@ namespace Opm {
                                          + ". Can not infer reference depth" );
         }
 
-        return completions.get( 0 ).center_depth;
+        return completions.get( 0 ).depth();
     }
 
     void Well::setRefDepth( size_t timestep, double depth ) {
@@ -356,11 +361,11 @@ namespace Opm {
 
         const auto& connections = this->getConnections(time_step);
         for (const auto& conn : connections) {
-            auto pair = completions.find( conn.complnum );
+            auto pair = completions.find( conn.complnum() );
             if (pair == completions.end())
-                completions[conn.complnum] = {};
+                completions[conn.complnum()] = {};
 
-            pair = completions.find(conn.complnum);
+            pair = completions.find(conn.complnum());
             pair->second.push_back(conn);
         }
 
@@ -376,6 +381,14 @@ namespace Opm {
         return *m_completions.back();
     }
 
+    const std::size_t Well::getTotNoConn() const {
+        return this->m_totNoConn;
+    }
+
+    void Well::setTotNoConn(std::size_t noConn)  {
+        m_totNoConn = noConn;
+    }
+    
     const std::string Well::getGroupName(size_t time_step) const {
         return m_groupName.get(time_step);
     }
@@ -641,7 +654,7 @@ namespace Opm {
 
         for (auto c : this->getConnections(time_step)) {
             if (match(c))
-                c.complnum = complnum;
+                c.setComplnum( complnum );
 
             new_connections->add(c);
         }
@@ -654,8 +667,8 @@ namespace Opm {
             if (!match_eq(c.getI(), record, "I" , -1)) return false;
             if (!match_eq(c.getJ(), record, "J" , -1)) return false;
             if (!match_eq(c.getK(), record, "K", -1))  return false;
-            if (!match_ge(c.complnum, record, "C1"))     return false;
-            if (!match_le(c.complnum, record, "C2"))     return false;
+            if (!match_ge(c.complnum(), record, "C1"))     return false;
+            if (!match_le(c.complnum(), record, "C2"))     return false;
 
             return true;
         };
@@ -664,7 +677,7 @@ namespace Opm {
 
         for (auto c : this->getConnections(time_step)) {
             if (match(c))
-                c.state = status;
+                c.setState( status );
 
             new_connections->add(c);
         }
@@ -676,15 +689,23 @@ namespace Opm {
 
     void Well::handleCOMPDAT(size_t time_step, const DeckRecord& record, const EclipseGrid& grid, const Eclipse3DProperties& eclipseProperties) {
         WellConnections * connections = new WellConnections(this->getConnections(time_step));
-        connections->loadCOMPDAT(record, grid, eclipseProperties);
+	std::size_t totNC = 0;
+        connections->loadCOMPDAT(record, grid, eclipseProperties, totNC);
+	if (totNC > 0) {
+	    this->setTotNoConn(totNC);
+	}
         this->updateWellConnections(time_step, connections);
     }
 
 
-    void Well::handleCOMPSEGS(const DeckKeyword& keyword, size_t time_step) {
+    void Well::handleCOMPSEGS(const DeckKeyword& keyword, const EclipseGrid& grid, size_t time_step) {
         const auto& segment_set = this->getWellSegments(time_step);
         const auto& completion_set = this->getConnections( time_step );
-        WellConnections * new_connection_set = newConnectionsWithSegments(keyword, completion_set, segment_set);
+	std::size_t totNC = 0;
+        WellConnections * new_connection_set = newConnectionsWithSegments(keyword, completion_set, segment_set, grid, totNC);
+	if (totNC > 0) {
+	    this->setTotNoConn(totNC);
+	}
         this->updateWellConnections(time_step, new_connection_set);
     }
 
@@ -692,8 +713,8 @@ namespace Opm {
     void Well::handleWPIMULT(const DeckRecord& record, size_t time_step) {
 
         auto match = [=]( const Connection &c) -> bool {
-            if (!match_ge(c.complnum, record, "FIRST")) return false;
-            if (!match_le(c.complnum, record, "LAST"))  return false;
+            if (!match_ge(c.complnum(), record, "FIRST")) return false;
+            if (!match_le(c.complnum(), record, "LAST"))  return false;
             if (!match_eq(c.getI()  , record, "I", -1)) return false;
             if (!match_eq(c.getJ()  , record, "J", -1)) return false;
             if (!match_eq(c.getK()  , record, "K", -1)) return false;
@@ -706,7 +727,7 @@ namespace Opm {
 
         for (auto c : this->getConnections(time_step)) {
             if (match(c))
-                c.wellPi *= wellPi;
+                c.scaleWellPi( wellPi );
 
             new_connections->add(c);
         }

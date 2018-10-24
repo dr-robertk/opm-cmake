@@ -397,8 +397,15 @@ void RestartConfig::handleScheduleSection(const SCHEDULESection& schedule) {
             continue;
         }
 
-        if( !( name == "RPTRST" || name == "RPTSCHED" ) ) continue;
         if( this->m_timemap.size() <= current_step ) continue;
+
+        if (name == "SAVE") {
+            this->save_keywords.at(current_step) = true;
+        } else {
+            this->save_keywords.at(current_step) = false;
+        }
+
+        if( !( name == "RPTRST" || name == "RPTSCHED" ) ) continue;
 
         const bool is_RPTRST = name == "RPTRST";
         const auto& prev_sched = this->restart_schedule.back();
@@ -476,7 +483,8 @@ void RestartConfig::handleScheduleSection(const SCHEDULESection& schedule) {
         m_timemap( std::move( timemap ) ),
         m_first_restart_step( -1 ),
         restart_schedule( m_timemap, { 0, 0, 1 } ),
-        restart_keywords( m_timemap, {} )
+        restart_keywords( m_timemap, {} ),
+        save_keywords( m_timemap.size(), false )
     {
         handleSolutionSection( solution );
         handleScheduleSection( schedule );
@@ -493,6 +501,12 @@ void RestartConfig::handleScheduleSection(const SCHEDULESection& schedule) {
     bool RestartConfig::getWriteRestartFile(size_t timestep) const {
         if (0 == timestep)
             return m_write_initial_RST_file;
+
+        if (save_keywords[timestep]) {
+            std::string logstring = "Fast restart using SAVE is not supported. Standard restart file is written instead";
+            Opm::OpmLog::warning("Unhandled output keyword", logstring);
+            return true;
+        }
 
         {
             RestartSchedule ts_restart_config = getNode( timestep );

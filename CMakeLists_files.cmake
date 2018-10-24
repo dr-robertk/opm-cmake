@@ -135,10 +135,9 @@ if(ENABLE_ECL_INPUT)
 endif()
 if(ENABLE_ECL_OUTPUT)
   list( APPEND MAIN_SOURCE_FILES
-          src/opm/test_util/summaryIntegrationTest.cpp
-          src/opm/test_util/summaryRegressionTest.cpp
-          src/opm/test_util/summaryComparator.cpp
-          src/opm/test_util/EclFilesComparator.cpp
+          src/opm/output/eclipse/AggregateConnectionData.cpp
+          src/opm/output/eclipse/AggregateGroupData.cpp
+          src/opm/output/eclipse/AggregateMSWData.cpp
           src/opm/output/eclipse/AggregateWellData.cpp
           src/opm/output/eclipse/CreateDoubHead.cpp
           src/opm/output/eclipse/CreateInteHead.cpp
@@ -148,7 +147,9 @@ if(ENABLE_ECL_OUTPUT)
           src/opm/output/eclipse/EclipseGridInspector.cpp
           src/opm/output/eclipse/EclipseIO.cpp
           src/opm/output/eclipse/InteHEAD.cpp
+          src/opm/output/eclipse/libECLRestart.cpp
           src/opm/output/eclipse/LinearisedOutputTable.cpp
+          src/opm/output/eclipse/LoadRestart.cpp
           src/opm/output/eclipse/LogiHEAD.cpp
           src/opm/output/eclipse/RestartIO.cpp
           src/opm/output/eclipse/Summary.cpp
@@ -237,8 +238,6 @@ if(ENABLE_ECL_OUTPUT)
   list (APPEND TEST_SOURCE_FILES
           tests/test_AggregateWellData.cpp
           tests/test_CharArrayNullTerm.cpp
-          tests/test_compareSummary.cpp
-          tests/test_EclFilesComparator.cpp
           tests/test_EclipseIO.cpp
           tests/test_DoubHEAD.cpp
           tests/test_InteHEAD.cpp
@@ -272,6 +271,8 @@ if(ENABLE_ECL_OUTPUT)
           tests/table_deck.DATA
           tests/summary_deck_non_constant_porosity.DATA
           tests/SUMMARY_EFF_FAC.DATA
+          tests/SPE1CASE1.DATA
+          tests/SPE9_CP_PACKED.DATA
       )
 endif()
 
@@ -283,12 +284,6 @@ if(ENABLE_ECL_INPUT)
     examples/opmpack.cpp
   )
 endif()
-if(ENABLE_ECL_OUTPUT)
-  list(APPEND EXAMPLE_SOURCE_FILES
-          examples/test_util/compareECL.cpp
-          examples/test_util/compareSummary.cpp
-      )
-endif()
 
 # programs listed here will not only be compiled, but also marked for
 # installation
@@ -299,12 +294,6 @@ if(ENABLE_ECL_INPUT)
     examples/opmi.cpp
     examples/opmpack.cpp
   )
-endif()
-if(ENABLE_ECL_OUTPUT)
-  list(APPEND PROGRAM_SOURCE_FILES
-          examples/test_util/compareECL.cpp
-          examples/test_util/compareSummary.cpp
-      )
 endif()
 
 list( APPEND PUBLIC_HEADER_FILES
@@ -497,8 +486,12 @@ if(ENABLE_ECL_OUTPUT)
         opm/output/data/Cells.hpp
         opm/output/data/Solution.hpp
         opm/output/data/Wells.hpp
+        opm/output/eclipse/VectorItems/connection.hpp
         opm/output/eclipse/VectorItems/intehead.hpp
         opm/output/eclipse/VectorItems/well.hpp
+        opm/output/eclipse/AggregateGroupData.hpp
+        opm/output/eclipse/AggregateConnectionData.hpp
+        opm/output/eclipse/AggregateMSWData.hpp
         opm/output/eclipse/AggregateWellData.hpp
         opm/output/eclipse/CharArrayNullTerm.hpp
         opm/output/eclipse/DoubHEAD.hpp
@@ -506,8 +499,9 @@ if(ENABLE_ECL_OUTPUT)
         opm/output/eclipse/EclipseIO.hpp
         opm/output/eclipse/EclipseIOUtil.hpp
         opm/output/eclipse/InteHEAD.hpp
-        opm/output/eclipse/LogiHEAD.hpp
+        opm/output/eclipse/libECLRestart.hpp
         opm/output/eclipse/LinearisedOutputTable.hpp
+        opm/output/eclipse/LogiHEAD.hpp
         opm/output/eclipse/RegionCache.hpp
         opm/output/eclipse/RestartIO.hpp
         opm/output/eclipse/RestartValue.hpp
@@ -517,9 +511,5 @@ if(ENABLE_ECL_OUTPUT)
         opm/output/eclipse/WindowedArray.hpp
         opm/output/eclipse/WriteRestartHelpers.hpp
         opm/output/OutputWriter.hpp
-        opm/test_util/EclFilesComparator.hpp
-        opm/test_util/summaryComparator.hpp
-        opm/test_util/summaryIntegrationTest.hpp
-        opm/test_util/summaryRegressionTest.hpp
         )
 endif()

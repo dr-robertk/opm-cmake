@@ -21,6 +21,8 @@
 #include <stdexcept>
 #include <vector>
 
+#include <ert/ecl/ecl_grid_dims.hpp>
+
 #include <opm/parser/eclipse/Deck/Deck.hpp>
 #include <opm/parser/eclipse/Deck/DeckKeyword.hpp>
 #include <opm/parser/eclipse/Deck/DeckRecord.hpp>
@@ -46,6 +48,8 @@ namespace Opm {
             init(deck.getKeyword("SPECGRID"));
         else if (deck.hasKeyword("DIMENS"))
             init(deck.getKeyword("DIMENS"));
+        else if (deck.hasKeyword("GDFILE"))
+            binary_init(deck);
         else
             throw std::invalid_argument("Must have either SPECGRID or DIMENS to indicate grid dimensions");
     }
@@ -60,6 +64,22 @@ namespace Opm {
 
     size_t GridDims::getNZ() const {
         return m_nz;
+    }
+
+    size_t GridDims::operator[](int dim) const {
+        switch (dim) {
+        case 0:
+            return this->m_nx;
+            break;
+        case 1:
+            return this->m_ny;
+            break;
+        case 2:
+            return this->m_nz;
+            break;
+        default:
+            throw std::invalid_argument("Invalid argument dim:" + std::to_string(dim));
+        }
     }
 
     const std::array<int, 3> GridDims::getNXYZ() const {
@@ -116,4 +136,19 @@ namespace Opm {
         m_ny = dims[1];
         m_nz = dims[2];
     }
+
+    void GridDims::binary_init(const Deck& deck) {
+        const DeckKeyword& gdfile_kw = deck.getKeyword("GDFILE");
+        const std::string& gdfile_arg = gdfile_kw.getRecord(0).getItem("filename").get<std::string>(0);
+        std::string filename = deck.makeDeckPath(gdfile_arg);
+        ecl_grid_dims_type * grid_dims = ecl_grid_dims_alloc( filename.c_str(), nullptr );
+        if (grid_dims) {
+            const auto& dims = ecl_grid_dims_iget_dims(grid_dims, 0);
+            m_nx = dims->nx;
+            m_ny = dims->ny;
+            m_nz = dims->nz;
+        } else
+            throw std::invalid_argument("Could not determine grid dimensions from: " + filename);
+    }
+
 }

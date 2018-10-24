@@ -20,8 +20,6 @@
   You should have received a copy of the GNU General Public License
   along with OPM.  If not, see <http://www.gnu.org/licenses/>.
 */
-#include <unordered_map>
-
 #include "config.h"
 
 #include <opm/output/eclipse/EclipseIO.hpp>
@@ -38,12 +36,15 @@
 #include <opm/parser/eclipse/EclipseState/Schedule/ScheduleEnums.hpp>
 #include <opm/parser/eclipse/EclipseState/Schedule/Well.hpp>
 #include <opm/parser/eclipse/Utility/Functional.hpp>
-#include <opm/output/eclipse/Summary.hpp>
-#include <opm/output/eclipse/Tables.hpp>
+
 #include <opm/output/eclipse/RestartIO.hpp>
+#include <opm/output/eclipse/Summary.hpp>
+#include <opm/output/eclipse/SummaryState.hpp>
+#include <opm/output/eclipse/Tables.hpp>
 
 #include <cstdlib>
 #include <memory>     // unique_ptr
+#include <unordered_map>
 #include <utility>    // move
 
 #include <ert/ecl/EclKW.hpp>
@@ -204,7 +205,7 @@ class EclipseIO::Impl {
     public:
     Impl( const EclipseState&, EclipseGrid, const Schedule&, const SummaryConfig& );
         void writeINITFile( const data::Solution& simProps, std::map<std::string, std::vector<int> > int_data, const NNC& nnc) const;
-        void writeEGRIDFile( const NNC& nnc ) const;
+        void writeEGRIDFile( const NNC& nnc );
 
         const EclipseState& es;
         EclipseGrid grid;
@@ -354,7 +355,7 @@ void EclipseIO::Impl::writeINITFile( const data::Solution& simProps, std::map<st
             const std::string& key = pair.first;
             const std::vector<int>& int_vector = pair.second;
             if (key.size() > ECL_STRING8_LENGTH)
-              throw std::invalid_argument("Keyword is too long.");            
+              throw std::invalid_argument("Keyword is too long.");
 
             writeKeyword( fortio , key , int_vector );
         }
@@ -373,7 +374,7 @@ void EclipseIO::Impl::writeINITFile( const data::Solution& simProps, std::map<st
 }
 
 
-void EclipseIO::Impl::writeEGRIDFile( const NNC& nnc ) const {
+void EclipseIO::Impl::writeEGRIDFile( const NNC& nnc ) {
     const auto& ioConfig = this->es.getIOConfig();
 
     std::string  egridFile( ERT::EclFilename( this->outputDir,
@@ -381,20 +382,14 @@ void EclipseIO::Impl::writeEGRIDFile( const NNC& nnc ) const {
                                               ECL_EGRID_FILE,
                                               ioConfig.getFMTOUT() ));
 
-    {
-        int idx = 0;
-        auto* ecl_grid = const_cast< ecl_grid_type* >( this->grid.c_ptr() );
-        for (const NNCdata& n : nnc.nncdata())
-            ecl_grid_add_self_nnc( ecl_grid, n.cell1, n.cell2, idx++);
-
-        ecl_grid_fwrite_EGRID2(ecl_grid, egridFile.c_str(), this->es.getDeckUnitSystem().getEclType() );
-    }
+    this->grid.addNNC( nnc );
+    this->grid.save( egridFile, this->es.getDeckUnitSystem().getType());
 }
 
 /*
 int_data: Writes key(string) and integers vector to INIT file as eclipse keywords
-- Key: Max 8 chars.   
-- Wrong input: invalid_argument exception.                                   
+- Key: Max 8 chars.
+- Wrong input: invalid_argument exception.
 */
 void EclipseIO::writeInitial( data::Solution simProps, std::map<std::string, std::vector<int> > int_data, const NNC& nnc) {
     if( !this->impl->output_enabled )
@@ -422,7 +417,7 @@ void EclipseIO::writeTimeStep(int report_step,
                               const std::map<std::string, double>& single_summary_values,
                               const std::map<std::string, std::vector<double> >& region_summary_values,
                               const std::map<std::pair<std::string, int>, double>& block_summary_values,
-                              bool write_double)
+                              const bool write_double)
  {
 
     if( !this->impl->output_enabled )
@@ -439,9 +434,10 @@ void EclipseIO::writeTimeStep(int report_step,
 
 
     /*
-      Summary data is written unconditionally for every timestep.
+      Summary data is written unconditionally for every timestep except for the
+      very intial report_step==0 call, which is only garbage.
     */
-    {
+    if (report_step > 0) {
         this->impl->summary.add_timestep( report_step,
                                           secs_elapsed,
                                           es,
@@ -452,7 +448,6 @@ void EclipseIO::writeTimeStep(int report_step,
                                           block_summary_values);
         this->impl->summary.write();
     }
-
 
     /*
       Current implementation will not write restart files for substep,
@@ -466,8 +461,8 @@ void EclipseIO::writeTimeStep(int report_step,
                                                  ioConfig.getUNIFOUT() ? ECL_UNIFIED_RESTART_FILE : ECL_RESTART_FILE,
                                                  report_step,
                                                  ioConfig.getFMTOUT() );
-
-        RestartIO::save( filename , report_step, secs_elapsed, value, es , grid , schedule, write_double);
+        RestartIO::save(filename, report_step, secs_elapsed, value, es, grid, schedule,
+                        this->impl->summary.get_restart_vectors(), write_double);
     }
 
 

@@ -20,7 +20,6 @@
 #include <algorithm>
 #include <cassert>
 #include <vector>
-#include <iostream>
 
 #include <opm/parser/eclipse/Deck/DeckItem.hpp>
 #include <opm/parser/eclipse/Deck/DeckKeyword.hpp>
@@ -36,27 +35,44 @@
 
 namespace Opm {
 
+
     Connection::Connection(int i, int j , int k ,
                            int compnum,
                            double depth,
                            WellCompletion::StateEnum stateArg ,
-                           const Value<double>& connectionTransmissibilityFactor,
-                           const Value<double>& diameter,
-                           const Value<double>& skinFactor,
-                           const Value<double>& Kh,
+                           double CF,
+                           double Kh,
+                           double rw,
                            const int satTableId,
-                           const WellCompletion::DirectionEnum direction)
-        : dir(direction),
+                           const WellCompletion::DirectionEnum direction,
+			   const std::size_t seqIndex,
+			   const double segDistStart,
+			   const double segDistEnd,
+			   const bool defaultSatTabId
+			  )
+        : direction(direction),
           center_depth(depth),
-          state(stateArg),
+          open_state(stateArg),
           sat_tableId(satTableId),
-          complnum( compnum ),
+          m_complnum( compnum ),
+          m_CF(CF),
+          m_Kh(Kh),
+          m_rw(rw),
           ijk({i,j,k}),
-          m_diameter(diameter),
-          m_connectionTransmissibilityFactor(connectionTransmissibilityFactor),
-          m_skinFactor(skinFactor),
-          m_Kh(Kh)
+          m_seqIndex(seqIndex),
+          m_segDistStart(segDistStart),
+          m_segDistEnd(segDistEnd),
+          m_defaultSatTabId(defaultSatTabId)
     {}
+
+    /*bool Connection::sameCoordinate(const Connection& other) const {
+        if ((m_i == other.m_i) &&
+            (m_j == other.m_j) &&
+            (m_k == other.m_k))
+            return true;
+        else
+            return false;
+    }*/
 
     bool Connection::sameCoordinate(const int i, const int j, const int k) const {
         if ((ijk[0] == i) && (ijk[1] == j) && (ijk[2] == k)) {
@@ -80,49 +96,121 @@ namespace Opm {
         return ijk[2];
     }
 
-
-    double Connection::getConnectionTransmissibilityFactor() const {
-        return m_connectionTransmissibilityFactor.getValue();
-    }
-
-    double Connection::getDiameter() const {
-        return m_diameter.getValue();
-    }
-
-    double Connection::getSkinFactor() const {
-        return m_skinFactor.getValue();
-    }
-
-
-    const Value<double>& Connection::getConnectionTransmissibilityFactorAsValueObject() const {
-        return m_connectionTransmissibilityFactor;
-    }
-
-    const Value<double>& Connection::getEffectiveKhAsValueObject() const {
-        return m_Kh;
-    }
-
     bool Connection::attachedToSegment() const {
         return (segment_number > 0);
+    }
+    
+    const std::size_t& Connection::getSeqIndex() const {
+        return m_seqIndex;
+    }
+    
+    const bool& Connection::getDefaultSatTabId() const {
+        return m_defaultSatTabId;
+    }
+    
+    const std::size_t& Connection::getCompSegSeqIndex() const {
+        return m_compSeg_seqIndex;
+    }
+
+    WellCompletion::DirectionEnum Connection::dir() const {
+        return this->direction;
+    }
+
+    const double& Connection::getSegDistStart() const {
+        return m_segDistStart;
+    }
+
+    const double& Connection::getSegDistEnd() const {
+        return m_segDistEnd;
+    }
+
+    
+    void Connection::setCompSegSeqIndex(std::size_t index) {
+        m_compSeg_seqIndex = index;
+    }
+    
+    void Connection::setDefaultSatTabId(bool id) {
+        m_defaultSatTabId = id;
+    }
+    
+    void Connection::setSegDistStart(const double& distStart) {
+        m_segDistStart = distStart;
+    }
+
+    void Connection::setSegDistEnd(const double& distEnd) {
+        m_segDistEnd = distEnd;
+    }
+    
+    double Connection::depth() const {
+        return this->center_depth;
+    }
+
+    WellCompletion::StateEnum Connection::state() const {
+        return this->open_state;
+    }
+
+    int Connection::satTableId() const {
+        return this->sat_tableId;
+    }
+
+    int Connection::complnum() const {
+        return this->m_complnum;
+    }
+
+    void Connection::setComplnum(int complnum) {
+        this->m_complnum = complnum;
+    }
+
+    double Connection::CF() const {
+        return this->m_CF;
+    }
+
+    double Connection::Kh() const {
+        return this->m_Kh;
+    }
+
+    double Connection::rw() const {
+        return this->m_rw;
+    }
+
+    void Connection::setState(WellCompletion::StateEnum state) {
+        this->open_state = state;
+    }
+
+  void Connection::updateSegment(int segment_number, double center_depth, std::size_t seqIndex) {
+        this->segment_number = segment_number;
+        this->center_depth = center_depth;
+        this->m_seqIndex = seqIndex;
+    }
+
+    int Connection::segment() const {
+        return this->segment_number;
+    }
+
+    void Connection::scaleWellPi(double wellPi) {
+        this->wPi *= wellPi;
+    }
+
+    double Connection::wellPi() const {
+        return this->wPi;
     }
 
     bool Connection::operator==( const Connection& rhs ) const {
         return this->ijk == rhs.ijk
-            && this->complnum == rhs.complnum
-            && this->m_diameter == rhs.m_diameter
-            && this->m_connectionTransmissibilityFactor == rhs.m_connectionTransmissibilityFactor
-            && this->wellPi == rhs.wellPi
-            && this->m_skinFactor == rhs.m_skinFactor
+            && this->m_complnum == rhs.m_complnum
+            && this->m_CF == rhs.m_CF
+            && this->m_rw == rhs.m_rw
+            && this->wPi == rhs.wPi
+            && this->m_Kh == rhs.m_Kh
             && this->sat_tableId == rhs.sat_tableId
-            && this->state == rhs.state
-            && this->dir == rhs.dir
+            && this->open_state == rhs.open_state
+            && this->direction == rhs.direction
             && this->segment_number == rhs.segment_number
-            && this->center_depth == rhs.center_depth;
+            && this->center_depth == rhs.center_depth
+            && this->m_seqIndex == rhs.m_seqIndex;
     }
 
     bool Connection::operator!=( const Connection& rhs ) const {
         return !( *this == rhs );
     }
 }
-
-

@@ -7,6 +7,7 @@ set(OPM_MACROS_ROOT ${PROJECT_SOURCE_DIR})
 
 option(ENABLE_ECL_INPUT "Enable eclipse input support?" ON)
 option(ENABLE_ECL_OUTPUT "Enable eclipse output support?" ON)
+option(ENABLE_MOCKSIM "Build the mock simulator for io testing" OFF)
 
 # Output implies input
 if(ENABLE_ECL_OUTPUT)
@@ -17,6 +18,7 @@ endif()
 if(NOT ENABLE_ECL_INPUT)
   set(ENABLE_ECL_OUTPUT OFF)
 endif()
+
 
 # not the same location as most of the other projects; this hook overrides
 macro (dir_hook)
@@ -36,12 +38,10 @@ set(OPM_PROJECT_EXTRA_CODE_INTREE "#ENABLE_ECL_INPUT is needed by opm-common-pre
                                    include(OpmPackage) #Make macros availabe after find_package(opm-common)")
 if(ENABLE_ECL_OUTPUT)
   set(OPM_PROJECT_EXTRA_CODE_INSTALLED "${OPM_PROJECT_EXTRA_CODE_INSTALLED}
-                                        set(COMPARE_SUMMARY_COMMAND ${CMAKE_INSTALL_PREFIX}/bin${${name}_VER_DIR}/compareSummary)
                                         set(COMPARE_ECL_COMMAND ${CMAKE_INSTALL_PREFIX}/bin${${name}_VER_DIR}/compareECL)
                                         set(OPM_PACK_COMMAND ${CMAKE_INSTALL_PREFIX}/bin${${name}_VER_DIR}/opmpack)")
 
   set(OPM_PROJECT_EXTRA_CODE_INTREE "${OPM_PROJECT_EXTRA_CODE_INTREE}
-                                     set(COMPARE_SUMMARY_COMMAND ${PROJECT_BINARY_DIR}/bin/compareSummary)
                                      set(COMPARE_ECL_COMMAND ${PROJECT_BINARY_DIR}/bin/compareECL)
                                      set(OPM_PACK_COMMAND ${PROJECT_BINARY_DIR}/bin/opmpack)")
 endif()
@@ -132,5 +132,61 @@ endmacro (install_hook)
 # all setup common to the OPM library modules is done here
 include (OpmLibMain)
 
+if (ENABLE_MOCKSIM)
+  add_library(mocksim
+              msim/src/msim.cpp)
+  target_link_libraries(mocksim opmcommon)
+  target_include_directories(mocksim PUBLIC msim/include)
+  add_executable(msim examples/msim.cpp)
+  target_link_libraries(msim mocksim)
+
+  set(_libs mocksim opmcommon
+    ${Boost_UNIT_TEST_FRAMEWORK_LIBRARY})
+
+  foreach( test test_msim)
+     add_executable(${test} "tests/msim/${test}")
+     target_link_libraries(${test} ${_libs})
+     add_test(NAME ${test} COMMAND ${test})
+     set_tests_properties(${test} PROPERTIES WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+
+     if(HAVE_DYNAMIC_BOOST_TEST)
+       set_target_properties(${test} PROPERTIES
+                             COMPILE_DEFINITIONS BOOST_TEST_DYN_LINK)
+     endif()
+  endforeach()
+endif()
+
+# Build the compare utilities
+if(ENABLE_ECL_INPUT)
+  add_library(testutil STATIC
+              examples/test_util/EclFilesComparator.cpp
+              examples/test_util/EclIntegrationTest.cpp
+              examples/test_util/EclRegressionTest.cpp
+              examples/test_util/summaryComparator.cpp
+              examples/test_util/summaryIntegrationTest.cpp
+              examples/test_util/summaryRegressionTest.cpp)
+  target_link_libraries(testutil ecl)
+  add_executable(compareECL examples/test_util/compareECL.cpp)
+  target_link_libraries(compareECL testutil opmcommon)
+
+  # Add the tests
+  set(_libs testutil opmcommon
+            ${Boost_UNIT_TEST_FRAMEWORK_LIBRARY})
+  opm_add_test(test_compareSummary CONDITION ENABLE_ECL_INPUT
+                                   LIBRARIES ${_libs})
+  opm_add_test(test_EclFilesComparator CONDITION ENABLE_ECL_INPUT
+                                       LIBRARIES ${_libs})
+  if(HAVE_DYNAMIC_BOOST_TEST)
+    set_target_properties(test_compareSummary PROPERTIES
+                          COMPILE_DEFINITIONS BOOST_TEST_DYN_LINK)
+    set_target_properties(test_EclFilesComparator PROPERTIES
+                          COMPILE_DEFINITIONS BOOST_TEST_DYN_LINK)
+  endif()
+  install(TARGETS compareECL DESTINATION bin)
+endif()
+
 # Install build system files
 install(DIRECTORY cmake DESTINATION share/opm)
+
+# Install tab completion skeleton
+install(FILES etc/opm_bash_completion.sh.in DESTINATION share/opm/etc)
