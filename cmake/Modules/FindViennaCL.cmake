@@ -24,11 +24,15 @@ if( VIENNACL_INCLUDE_DIR )
   set(VIENNACL_FOUND TRUE)
 endif()
 
-#set HAVE_VIENNACL for config.h
-set(HAVE_VIENNACL ${VIENNACL_FOUND})
+if (VIENNACL_FOUND)
+  #set HAVE_VIENNACL for config.h
+  set(HAVE_VIENNACL 1)
+endif()
 
-#set HAVE_OPENCL for config.h
-set(HAVE_OPENCL ${OpenCL_FOUND})
+if(OpenCL_FOUND)
+  #set HAVE_OPENCL for config.h
+  set(HAVE_OPENCL 1)
+endif()
 
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(ViennaCL DEFAULT_MSG VIENNACL_INCLUDE_DIRS)
