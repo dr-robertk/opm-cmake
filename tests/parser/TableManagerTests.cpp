@@ -22,7 +22,6 @@
 #include <boost/test/unit_test.hpp>
 
 #include <opm/parser/eclipse/Parser/Parser.hpp>
-#include <opm/parser/eclipse/Parser/ParseContext.hpp>
 #include <opm/parser/eclipse/Deck/Deck.hpp>
 
 // generic table classes
@@ -67,7 +66,7 @@ Opm::Deck createSingleRecordDeck() {
         " 9 10 11 12 /\n";
 
     Opm::Parser parser;
-    return parser.parseString(deckData, Opm::ParseContext());
+    return parser.parseString(deckData);
 }
 
 
@@ -96,7 +95,7 @@ Opm::Deck createSingleRecordDeckWithVd() {
         "9000.0 0.22 0.22 1.0 0.0 0.04 1.0 0.18 0.22 /";
 
     Opm::Parser parser;
-    return parser.parseString(deckData, Opm::ParseContext());
+    return parser.parseString(deckData);
 }
 
 Opm::Deck createSingleRecordDeckWithJFunc() {
@@ -126,7 +125,7 @@ Opm::Deck createSingleRecordDeckWithJFunc() {
         "9000.0 0.22 0.22 1.0 0.0 0.04 1.0 0.18 0.22 /";
 
     Opm::Parser parser;
-    return parser.parseString(deckData, Opm::ParseContext());
+    return parser.parseString(deckData);
 }
 
 Opm::Deck createSingleRecordDeckWithJFuncBoth() {
@@ -135,7 +134,7 @@ Opm::Deck createSingleRecordDeckWithJFuncBoth() {
         "JFUNC\n * 55.0 88.0 /\n" // ASTERISK MEANS DEFAULT VALUE
         "TABDIMS\n 2 /\n";
     Opm::Parser parser;
-    return parser.parseString(deckData, Opm::ParseContext());
+    return parser.parseString(deckData);
 }
 
 Opm::Deck createSingleRecordDeckWithFullJFunc() {
@@ -144,7 +143,7 @@ Opm::Deck createSingleRecordDeckWithFullJFunc() {
         "JFUNC\n WATER 2.7182 3.1416 0.6 0.7 Z /\n"
         "TABDIMS\n 2 /\n";
     Opm::Parser parser;
-    return parser.parseString(deckData, Opm::ParseContext());
+    return parser.parseString(deckData);
 }
 
 Opm::Deck createSingleRecordDeckWithJFuncBrokenFlag() {
@@ -153,7 +152,7 @@ Opm::Deck createSingleRecordDeckWithJFuncBrokenFlag() {
         "JFUNC\n GARBAGE 55.0 88.0 /\n"
         "TABDIMS\n 2 /\n";
     Opm::Parser parser;
-    return parser.parseString(deckData, Opm::ParseContext());
+    return parser.parseString(deckData);
 }
 
 Opm::Deck createSingleRecordDeckWithJFuncBrokenDirection() {
@@ -162,7 +161,7 @@ Opm::Deck createSingleRecordDeckWithJFuncBrokenDirection() {
         "JFUNC\n * * * * * XZ /\n"
         "TABDIMS\n 2 /\n";
     Opm::Parser parser;
-    return parser.parseString(deckData, Opm::ParseContext());
+    return parser.parseString(deckData);
 }
 
 
@@ -246,7 +245,7 @@ BOOST_AUTO_TEST_CASE(SwofTable_Tests) {
         " 17 18 19 20/\n";
 
     Opm::Parser parser;
-    auto deck = parser.parseString(deckData, Opm::ParseContext());
+    auto deck = parser.parseString(deckData);
 
     Opm::SwofTable swof1Table(deck.getKeyword("SWOF").getRecord(0).getItem(0), false);
     Opm::SwofTable swof2Table(deck.getKeyword("SWOF").getRecord(1).getItem(0), false);
@@ -288,7 +287,7 @@ BOOST_AUTO_TEST_CASE(PbvdTable_Tests) {
         " 1 2/\n";
 
     Opm::Parser parser;
-    auto deck = parser.parseString(deckData, Opm::ParseContext());
+    auto deck = parser.parseString(deckData);
 
     Opm::PbvdTable pbvdTable1(deck.getKeyword("PBVD").getRecord(0).getItem(0));
 
@@ -316,7 +315,7 @@ BOOST_AUTO_TEST_CASE(PdvdTable_Tests) {
         " 1 2/\n";
 
     Opm::Parser parser;
-    auto deck = parser.parseString(deckData, Opm::ParseContext());
+    auto deck = parser.parseString(deckData);
 
     Opm::PdvdTable pdvdTable1(deck.getKeyword("PDVD").getRecord(0).getItem(0));
 
@@ -343,7 +342,7 @@ BOOST_AUTO_TEST_CASE(SgwfnTable_Tests) {
         " 17 18 19 20/\n";
 
     Opm::Parser parser;
-    auto deck = parser.parseString(deckData, Opm::ParseContext());
+    auto deck = parser.parseString(deckData);
 
 
     Opm::SgwfnTable sgwfn1Table(deck.getKeyword("SGWFN").getRecord(0).getItem(0));
@@ -386,7 +385,7 @@ BOOST_AUTO_TEST_CASE(SgofTable_Tests) {
         " 17 18 19 20/\n";
 
     Opm::Parser parser;
-    auto deck = parser.parseString(deckData, Opm::ParseContext());
+    auto deck = parser.parseString(deckData);
 
     Opm::SgofTable sgof1Table(deck.getKeyword("SGOF").getRecord(0).getItem(0), false);
     Opm::SgofTable sgof2Table(deck.getKeyword("SGOF").getRecord(1).getItem(0), false);
@@ -432,7 +431,7 @@ BOOST_AUTO_TEST_CASE(PlyadsTable_Tests) {
             "2.00    0.000030\n"
             "3.00    0.000030 /\n";
         Opm::Parser parser;
-        auto deck = parser.parseString(correctDeckData, Opm::ParseContext());
+        auto deck = parser.parseString(correctDeckData);
         const auto& plyadsKeyword = deck.getKeyword("PLYADS");
         Opm::PlyadsTable plyadsTable(plyadsKeyword.getRecord(0).getItem(0));
 
@@ -461,7 +460,7 @@ BOOST_AUTO_TEST_CASE(PlyadsTable_Tests) {
             "2.00    0.000030\n"
             "3.00    0.000030 /\n";
         Opm::Parser parser;
-        auto deck = parser.parseString(incorrectDeckData, Opm::ParseContext());
+        auto deck = parser.parseString(incorrectDeckData);
         const auto& plyadsKeyword = deck.getKeyword("PLYADS");
 
         BOOST_CHECK_THROW(Opm::PlyadsTable(plyadsKeyword.getRecord(0).getItem(0)), std::invalid_argument);
@@ -484,7 +483,7 @@ BOOST_AUTO_TEST_CASE(PlyadsTable_Tests) {
             "2.00    0.000030\n"
             "3.00    0.000029 /\n";
         Opm::Parser parser;
-        auto deck = parser.parseString(incorrectDeckData, Opm::ParseContext());
+        auto deck = parser.parseString(incorrectDeckData);
         const auto& plyadsKeyword = deck.getKeyword("PLYADS");
 
         BOOST_CHECK_THROW(Opm::PlyadsTable(plyadsKeyword.getRecord(0).getItem(0)), std::invalid_argument);
@@ -532,7 +531,7 @@ VFPPROD \n\
 2 2 2 2 46.5 47.5 48.5 / \n";
 
     Opm::Parser parser;
-    auto deck = parser.parseString(deckData, Opm::ParseContext());
+    auto deck = parser.parseString(deckData);
     auto units = Opm::UnitSystem::newMETRIC();
     const auto& vfpprodKeyword = deck.getKeyword("VFPPROD");
 
@@ -658,7 +657,7 @@ VFPPROD \n\
 1 1 1 1 1.5 /    \n";
 
     Opm::Parser parser;
-    auto deck = parser.parseString(deckData, Opm::ParseContext());
+    auto deck = parser.parseString(deckData);
     const auto& vfpprodKeyword = deck.getKeyword("VFPPROD");
     auto units = Opm::UnitSystem::newMETRIC();
 
@@ -806,7 +805,7 @@ VFPPROD \n\
 1 1 1 1 1.5 /    \n";
 
         Opm::Parser parser;
-        auto deck = parser.parseString(missing_values, Opm::ParseContext());
+        auto deck = parser.parseString(missing_values);
         const auto& vfpprodKeyword = deck.getKeyword("VFPPROD");
         auto units = Opm::UnitSystem::newMETRIC();
         BOOST_CHECK_EQUAL(deck.count("VFPPROD"), 1);
@@ -840,7 +839,7 @@ VFPPROD \n\
 1 1 1 1 1.5 /    \n";
 
         Opm::Parser parser;
-        auto deck = parser.parseString(missing_values, Opm::ParseContext());
+        auto deck = parser.parseString(missing_values);
         const auto& vfpprodKeyword = deck.getKeyword("VFPPROD");
         auto units = Opm::UnitSystem::newMETRIC();
         BOOST_CHECK_EQUAL(deck.count("VFPPROD"), 1);
@@ -872,7 +871,7 @@ VFPPROD \n\
 1 1 1 1 1.5 2.5 /    \n";
 
         Opm::Parser parser;
-        auto deck = parser.parseString(missing_metadata, Opm::ParseContext());
+        auto deck = parser.parseString(missing_metadata);
         const auto& vfpprodKeyword = deck.getKeyword("VFPPROD");
         auto units = Opm::UnitSystem::newMETRIC();
         BOOST_CHECK_EQUAL(deck.count("VFPPROD"), 1);
@@ -905,7 +904,7 @@ VFPPROD \n\
 1 1 1 1 1.5 2.5 /    \n";
 
         Opm::Parser parser;
-        auto deck = parser.parseString(wrong_metadata, Opm::ParseContext());
+        auto deck = parser.parseString(wrong_metadata);
         const auto& vfpprodKeyword = deck.getKeyword("VFPPROD");
         auto units = Opm::UnitSystem::newMETRIC();
         BOOST_CHECK_EQUAL(deck.count("VFPPROD"), 1);
@@ -938,7 +937,7 @@ VFPPROD \n\
 1 1 1 1 1.5 2.5 /    \n";
 
         Opm::Parser parser;
-        auto deck = parser.parseString(missing_axes, Opm::ParseContext());
+        auto deck = parser.parseString(missing_axes);
         const auto& vfpprodKeyword = deck.getKeyword("VFPPROD");
         auto units = Opm::UnitSystem::newMETRIC();
         BOOST_CHECK_EQUAL(deck.count("VFPPROD"), 1);
@@ -969,7 +968,7 @@ VFPINJ \n\
 2 4.5 5.5 6.5 /    \n";
 
     Opm::Parser parser;
-    auto deck = parser.parseString(deckData, Opm::ParseContext());
+    auto deck = parser.parseString(deckData);
     const auto& vfpprodKeyword = deck.getKeyword("VFPINJ");
     auto units = Opm::UnitSystem::newMETRIC();
 
@@ -1069,7 +1068,7 @@ VFPINJ \n\
 2 4.5 5.5 /    \n";
 
         Opm::Parser parser;
-        auto deck = parser.parseString(missing_values, Opm::ParseContext());
+        auto deck = parser.parseString(missing_values);
         const auto& vfpinjKeyword = deck.getKeyword("VFPINJ");
         auto units = Opm::UnitSystem::newMETRIC();
         BOOST_CHECK_EQUAL(deck.count("VFPINJ"), 1);
@@ -1097,7 +1096,7 @@ VFPINJ \n\
 1 1.5 2.5 3.5 /    \n";
 
         Opm::Parser parser;
-        auto deck = parser.parseString(missing_values, Opm::ParseContext());
+        auto deck = parser.parseString(missing_values);
         const auto& vfpinjKeyword = deck.getKeyword("VFPINJ");
         auto units = Opm::UnitSystem::newMETRIC();
         BOOST_CHECK_EQUAL(deck.count("VFPINJ"), 1);
@@ -1124,7 +1123,7 @@ VFPINJ \n\
 2 4.5 5.5 6.5 /    \n";
 
         Opm::Parser parser;
-        auto deck = parser.parseString(missing_metadata, Opm::ParseContext());
+        auto deck = parser.parseString(missing_metadata);
         const auto& vfpinjKeyword = deck.getKeyword("VFPINJ");
         auto units = Opm::UnitSystem::newMETRIC();
         BOOST_CHECK_EQUAL(deck.count("VFPINJ"), 1);
@@ -1152,7 +1151,7 @@ VFPINJ \n\
 2 4.5 5.5 6.5 /    \n";
 
         Opm::Parser parser;
-        auto deck = parser.parseString(wrong_metadata, Opm::ParseContext());
+        auto deck = parser.parseString(wrong_metadata);
         const auto& vfpinjKeyword = deck.getKeyword("VFPINJ");
         auto units(Opm::UnitSystem::newMETRIC());
         BOOST_CHECK_EQUAL(deck.count("VFPINJ"), 1);
@@ -1180,7 +1179,7 @@ VFPINJ \n\
 2 4.5 5.5 6.5 /    \n";
 
         Opm::Parser parser;
-        auto deck = parser.parseString(missing_axes, Opm::ParseContext());
+        auto deck = parser.parseString(missing_axes);
         const auto& vfpinjKeyword = deck.getKeyword("VFPINJ");
         auto units = Opm::UnitSystem::newMETRIC();
         BOOST_CHECK_EQUAL(deck.count("VFPINJ"), 1);
@@ -1189,6 +1188,246 @@ VFPINJ \n\
     }
 }
 
+
+BOOST_AUTO_TEST_CASE( TestPLYMWINJ ) {
+    const char *inputstring =
+        "PLYMWINJ \n"
+        "   2   /    -- table number \n"
+        "   0.0     200.0   800.0   / -- throughput values \n"
+        "   0.0     1.0   2.0  3.0  / -- velocity values \n"
+        "   -- the rest will be the polymer molecular weight \n"
+        "   -- each row corresponds to one sample points in the throughput direction \n"
+        "   20.    19.   18.   16. /\n"
+        "   20.    16.   14.   12. /\n"
+        "   20.    12.   8.    4. /\n"
+        "PLYMWINJ \n"
+        "   3   /    -- table number \n"
+        "   0.0     100.0  / -- throughput values \n"
+        "   0.0     1.0   2.0  / -- velocity values \n"
+        "   -- the rest will be the polymer molecular weight \n"
+        "   -- each row corresponds to one sample points in the throughput direction \n"
+        "   20.    19.   18.   /\n"
+        "   20.    16.   14.   /\n";
+
+    Opm::Parser parser;
+    const Opm::Deck deck = parser.parseString(inputstring);
+    const Opm::TableManager tables( deck );
+    const auto& plymwinjtables = tables.getPlymwinjTables();
+
+    BOOST_CHECK_EQUAL( plymwinjtables.size(), 2 );
+
+    BOOST_CHECK( plymwinjtables.find(1) == plymwinjtables.end() );
+
+    {
+        const auto searchtable2 = plymwinjtables.find(2);
+        BOOST_CHECK( searchtable2 != plymwinjtables.end() );
+        const auto& table2 = searchtable2->second;
+        BOOST_CHECK_EQUAL( searchtable2->first, table2.getTableNumber() );
+        BOOST_CHECK_EQUAL( table2.getTableNumber(), 2 );
+
+        const std::vector<double>& throughputs = table2.getThroughputs();
+        BOOST_CHECK_EQUAL( throughputs.size(), 3 );
+        BOOST_CHECK_EQUAL( throughputs[1], 200.0 );
+        const std::vector<double>& velocities = table2.getVelocities();
+        BOOST_CHECK_EQUAL( velocities.size(), 4 );
+        constexpr double dayinseconds = 86400.;
+        BOOST_CHECK_EQUAL( velocities[2], 2.0 / dayinseconds );
+        const std::vector<std::vector<double>>& mwdata = table2.getMoleWeights();
+
+        BOOST_CHECK_EQUAL( mwdata.size(), throughputs.size() );
+        for (const auto& data : mwdata) {
+            BOOST_CHECK_EQUAL( data.size(), velocities.size() );
+        }
+        BOOST_CHECK_EQUAL(mwdata[2][3], 4.0);
+        BOOST_CHECK_EQUAL(mwdata[1][1], 16.0);
+    }
+
+    {
+        const auto searchtable3 = plymwinjtables.find(3);
+        BOOST_CHECK( searchtable3 != plymwinjtables.end() );
+        const auto& table3 = searchtable3->second;
+        BOOST_CHECK_EQUAL( searchtable3->first, table3.getTableNumber() );
+        BOOST_CHECK_EQUAL( table3.getTableNumber(), 3 );
+
+        const std::vector<double>& throughputs = table3.getThroughputs();
+        BOOST_CHECK_EQUAL( throughputs.size(), 2 );
+        BOOST_CHECK_EQUAL( throughputs[1], 100.0 );
+        const std::vector<double>& velocities = table3.getVelocities();
+        BOOST_CHECK_EQUAL( velocities.size(), 3 );
+        constexpr double dayinseconds = 86400.;
+        BOOST_CHECK_EQUAL( velocities[2], 2.0 / dayinseconds );
+        const std::vector<std::vector<double>>& mwdata = table3.getMoleWeights();
+
+        BOOST_CHECK_EQUAL( mwdata.size(), throughputs.size() );
+        for (const auto& data : mwdata) {
+            BOOST_CHECK_EQUAL( data.size(), velocities.size() );
+        }
+        BOOST_CHECK_EQUAL(mwdata[1][2], 14.0);
+        BOOST_CHECK_EQUAL(mwdata[0][0], 20.0);
+    }
+}
+
+BOOST_AUTO_TEST_CASE( TestSKPRWAT ) {
+    const char *inputstring =
+        "SKPRWAT \n"
+        "   1   /    -- table number \n"
+        "   0.0     200.0   800.0   / -- throughput values \n"
+        "   0.0     1.0   2.0  3.0  / -- velocity values \n"
+        "   -- the rest will be the skin pressure \n"
+        "   -- each row corresponds to one sample points in the throughput direction \n"
+        "   20.    19.   18.   16. /\n"
+        "   20.    16.   14.   12. /\n"
+        "   20.    12.   8.    4. /\n"
+        "SKPRWAT \n"
+        "   2   /    -- table number \n"
+        "   0.0     100.0  / -- throughput values \n"
+        "   0.0     1.0   2.0  / -- velocity values \n"
+        "   -- the rest will be the skin pressure \n"
+        "   -- each row corresponds to one sample points in the throughput direction \n"
+        "   20.    19.   18.   /\n"
+        "   20.    16.   14.   /\n";
+
+    Opm::Parser parser;
+    const Opm::Deck deck = parser.parseString(inputstring);
+    const Opm::TableManager tables( deck );
+    const auto& skprwattables = tables.getSkprwatTables();
+
+    BOOST_CHECK_EQUAL( skprwattables.size(), 2 );
+
+    BOOST_CHECK( skprwattables.find(3) == skprwattables.end() );
+
+    {
+        const auto searchtable1 = skprwattables.find(1);
+        BOOST_CHECK( searchtable1 != skprwattables.end() );
+        const auto& table1 = searchtable1->second;
+        BOOST_CHECK_EQUAL( searchtable1->first, table1.getTableNumber() );
+        BOOST_CHECK_EQUAL( table1.getTableNumber(), 1 );
+
+        const std::vector<double>& throughputs = table1.getThroughputs();
+        BOOST_CHECK_EQUAL( throughputs.size(), 3 );
+        BOOST_CHECK_EQUAL( throughputs[1], 200.0 );
+        const std::vector<double>& velocities = table1.getVelocities();
+        BOOST_CHECK_EQUAL( velocities.size(), 4 );
+        constexpr double dayinseconds = 86400.;
+        BOOST_CHECK_EQUAL( velocities[2], 2.0 / dayinseconds );
+        const std::vector<std::vector<double>>& skindata = table1.getSkinPressures();
+
+        BOOST_CHECK_EQUAL( skindata.size(), throughputs.size() );
+        for (const auto& data : skindata) {
+            BOOST_CHECK_EQUAL( data.size(), velocities.size() );
+        }
+        constexpr double barsa = 1.0e5;
+        BOOST_CHECK_EQUAL(skindata[2][3], 4.0 * barsa);
+        BOOST_CHECK_EQUAL(skindata[1][1], 16.0 * barsa);
+    }
+
+    {
+        const auto searchtable2 = skprwattables.find(2);
+        BOOST_CHECK( searchtable2 != skprwattables.end() );
+        const auto& table2 = searchtable2->second;
+        BOOST_CHECK_EQUAL( searchtable2->first, table2.getTableNumber() );
+        BOOST_CHECK_EQUAL( table2.getTableNumber(), 2 );
+
+        const std::vector<double>& throughputs = table2.getThroughputs();
+        BOOST_CHECK_EQUAL( throughputs.size(), 2 );
+        BOOST_CHECK_EQUAL( throughputs[1], 100.0 );
+        const std::vector<double>& velocities = table2.getVelocities();
+        BOOST_CHECK_EQUAL( velocities.size(), 3 );
+        constexpr double dayinseconds = 86400.;
+        BOOST_CHECK_EQUAL( velocities[2], 2.0 / dayinseconds );
+        const std::vector<std::vector<double>>& skindata = table2.getSkinPressures();
+
+        BOOST_CHECK_EQUAL( skindata.size(), throughputs.size() );
+        for (const auto& data : skindata) {
+            BOOST_CHECK_EQUAL( data.size(), velocities.size() );
+        }
+        constexpr double barsa = 1.0e5;
+        BOOST_CHECK_EQUAL(skindata[1][2], 14.0 * barsa);
+        BOOST_CHECK_EQUAL(skindata[0][0], 20.0 * barsa);
+    }
+}
+
+BOOST_AUTO_TEST_CASE( TestSKPRPOLY ) {
+    const char *inputstring =
+        "SKPRPOLY \n"
+        "   1   2.0 /    -- table number & reference concentration \n"
+        "   0.0     200.0   800.0   / -- throughput values \n"
+        "   0.0     1.0   2.0  3.0  / -- velocity values \n"
+        "   -- the rest will be the skin pressure \n"
+        "   -- each row corresponds to one sample points in the throughput direction \n"
+        "   20.    19.   18.   16. /\n"
+        "   20.    16.   14.   12. /\n"
+        "   20.    12.   8.    4. /\n"
+        "SKPRPOLY \n"
+        "   2   3.0 /    -- table number & reference concentration \n"
+        "   0.0     100.0  / -- throughput values \n"
+        "   0.0     1.0   2.0  / -- velocity values \n"
+        "   -- the rest will be the skin pressure \n"
+        "   -- each row corresponds to one sample points in the throughput direction \n"
+        "   20.    19.   18.   /\n"
+        "   20.    16.   14.   /\n";
+
+    Opm::Parser parser;
+    const Opm::Deck deck = parser.parseString(inputstring);
+    const Opm::TableManager tables( deck );
+    const auto& skprpolytables = tables.getSkprpolyTables();
+
+    BOOST_CHECK_EQUAL( skprpolytables.size(), 2 );
+
+    BOOST_CHECK( skprpolytables.find(4) == skprpolytables.end() );
+
+    {
+        const auto searchtable1 = skprpolytables.find(1);
+        BOOST_CHECK( searchtable1 != skprpolytables.end() );
+        const auto& table1 = searchtable1->second;
+        BOOST_CHECK_EQUAL( searchtable1->first, table1.getTableNumber() );
+        BOOST_CHECK_EQUAL( table1.getTableNumber(), 1 );
+
+        BOOST_CHECK_EQUAL( table1.referenceConcentration(), 2.0 );
+        const std::vector<double>& throughputs = table1.getThroughputs();
+        BOOST_CHECK_EQUAL( throughputs.size(), 3 );
+        BOOST_CHECK_EQUAL( throughputs[1], 200.0 );
+        const std::vector<double>& velocities = table1.getVelocities();
+        BOOST_CHECK_EQUAL( velocities.size(), 4 );
+        constexpr double dayinseconds = 86400.;
+        BOOST_CHECK_EQUAL( velocities[2], 2.0 / dayinseconds );
+        const std::vector<std::vector<double>>& skindata = table1.getSkinPressures();
+
+        BOOST_CHECK_EQUAL( skindata.size(), throughputs.size() );
+        for (const auto& data : skindata) {
+            BOOST_CHECK_EQUAL( data.size(), velocities.size() );
+        }
+        constexpr double barsa = 1.0e5;
+        BOOST_CHECK_EQUAL(skindata[2][3], 4.0 * barsa);
+        BOOST_CHECK_EQUAL(skindata[1][1], 16.0 * barsa);
+    }
+
+    {
+        const auto searchtable2 = skprpolytables.find(2);
+        BOOST_CHECK( searchtable2 != skprpolytables.end() );
+        const auto& table2 = searchtable2->second;
+        BOOST_CHECK_EQUAL( searchtable2->first, table2.getTableNumber() );
+        BOOST_CHECK_EQUAL( table2.getTableNumber(), 2 );
+
+        BOOST_CHECK_EQUAL( table2.referenceConcentration(), 3.0 );
+        const std::vector<double>& throughputs = table2.getThroughputs();
+        BOOST_CHECK_EQUAL( throughputs.size(), 2 );
+        BOOST_CHECK_EQUAL( throughputs[1], 100.0 );
+        const std::vector<double>& velocities = table2.getVelocities();
+        BOOST_CHECK_EQUAL( velocities.size(), 3 );
+        constexpr double dayinseconds = 86400.;
+        BOOST_CHECK_EQUAL( velocities[2], 2.0 / dayinseconds );
+        const std::vector<std::vector<double>>& skindata = table2.getSkinPressures();
+
+        BOOST_CHECK_EQUAL( skindata.size(), throughputs.size() );
+        for (const auto& data : skindata) {
+            BOOST_CHECK_EQUAL( data.size(), velocities.size() );
+        }
+        constexpr double barsa = 1.0e5;
+        BOOST_CHECK_EQUAL(skindata[1][2], 14.0 * barsa);
+        BOOST_CHECK_EQUAL(skindata[0][0], 20.0 * barsa);
+    }
+}
 
 BOOST_AUTO_TEST_CASE( TestPLYROCK ) {
     const char *data =
@@ -1200,7 +1439,7 @@ BOOST_AUTO_TEST_CASE( TestPLYROCK ) {
         " 10 20 30 40 50 /\n";
 
     Opm::Parser parser;
-    auto deck = parser.parseString(data, Opm::ParseContext());
+    auto deck = parser.parseString(data);
     Opm::TableManager tables( deck );
     const Opm::TableContainer& plyrock = tables.getPlyrockTables();
 
@@ -1228,7 +1467,7 @@ BOOST_AUTO_TEST_CASE( TestPLYMAX ) {
         " 10 20 /\n";
 
     Opm::Parser parser;
-    auto deck = parser.parseString(data, Opm::ParseContext());
+    auto deck = parser.parseString(data);
     Opm::TableManager tables( deck );
     const Opm::TableContainer& plymax = tables.getPlymaxTables();
 
@@ -1255,7 +1494,7 @@ BOOST_AUTO_TEST_CASE( TestParseDENSITY ) {
     )";
 
     Opm::Parser parser;
-    auto deck = parser.parseString(data, Opm::ParseContext());
+    auto deck = parser.parseString(data);
     Opm::TableManager tables( deck );
     const auto& density = tables.getDensityTable();
     BOOST_CHECK_EQUAL( 1.1, density[0].oil );
@@ -1274,7 +1513,7 @@ BOOST_AUTO_TEST_CASE( TestParseROCK ) {
     )";
 
     Opm::Parser parser;
-    auto deck = parser.parseString(data, Opm::ParseContext());
+    auto deck = parser.parseString(data);
     Opm::TableManager tables( deck );
     const auto& rock = tables.getRockTable();
     BOOST_CHECK_EQUAL( 1.1 * 1e5,  rock[0].reference_pressure );
@@ -1300,7 +1539,7 @@ BOOST_AUTO_TEST_CASE( TestParsePVCDO ) {
     )";
 
     Opm::Parser parser;
-    auto deck = parser.parseString(data, Opm::ParseContext());
+    auto deck = parser.parseString(data);
     Opm::TableManager tables( deck );
     const auto& pvcdo = tables.getPvcdoTable();
 
@@ -1322,7 +1561,7 @@ BOOST_AUTO_TEST_CASE( TestParsePVCDO ) {
         3600 1* 1.6e-5 0.88 0.0 /
     )";
 
-    auto illegal_default = parser.parseString( malformed, ParseContext() );
+    auto illegal_default = parser.parseString( malformed );
     BOOST_CHECK_THROW( TableManager{ illegal_default }, std::invalid_argument );
 }
 
@@ -1331,7 +1570,7 @@ BOOST_AUTO_TEST_CASE( TestParseTABDIMS ) {
       "TABDIMS\n"
       "  1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 /\n";
     Opm::Parser parser;
-    BOOST_CHECK_NO_THROW( parser.parseString(data, Opm::ParseContext()));
+    BOOST_CHECK_NO_THROW( parser.parseString(data));
 }
 
 BOOST_AUTO_TEST_CASE (Regdims_Entries) {

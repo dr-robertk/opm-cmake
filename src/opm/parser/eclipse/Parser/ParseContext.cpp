@@ -19,9 +19,11 @@
 
 #include <ert/util/util.h>
 #include <cstdlib>
+#include <iostream>
 
 #include <boost/algorithm/string.hpp>
 
+#include <opm/parser/eclipse/Parser/ErrorGuard.hpp>
 #include <opm/parser/eclipse/Parser/InputErrorAction.hpp>
 #include <opm/parser/eclipse/Parser/ParseContext.hpp>
 
@@ -74,7 +76,7 @@ namespace Opm {
         addKey(PARSE_RANDOM_SLASH, InputError::THROW_EXCEPTION);
         addKey(PARSE_MISSING_DIMS_KEYWORD, InputError::THROW_EXCEPTION);
         addKey(PARSE_EXTRA_DATA, InputError::THROW_EXCEPTION);
-        addKey(PARSE_MISSING_INCLUDE, InputError::THROW_EXCEPTION);
+        addKey(PARSE_MISSING_INCLUDE, InputError::EXIT1);
 
         addKey(UNSUPPORTED_SCHEDULE_GEO_MODIFIER, InputError::THROW_EXCEPTION);
         addKey(UNSUPPORTED_COMPORD_TYPE, InputError::THROW_EXCEPTION);
@@ -85,13 +87,23 @@ namespace Opm {
 
         addKey(SUMMARY_UNKNOWN_WELL, InputError::THROW_EXCEPTION);
         addKey(SUMMARY_UNKNOWN_GROUP, InputError::THROW_EXCEPTION);
+        addKey(SUMMARY_UNHANDLED_KEYWORD, InputError::WARN);
         addKey(SCHEDULE_INVALID_NAME, InputError::THROW_EXCEPTION);
+
+        addKey(ACTIONX_ILLEGAL_KEYWORD, InputError::THROW_EXCEPTION);
+
+        addKey(RPT_MIXED_STYLE, InputError::WARN);
+        addKey(RPT_UNKNOWN_MNEMONIC, InputError::WARN);
     }
 
     void ParseContext::initEnv() {
         envUpdate( "OPM_ERRORS_EXCEPTION" , InputError::THROW_EXCEPTION );
         envUpdate( "OPM_ERRORS_WARN" , InputError::WARN );
         envUpdate( "OPM_ERRORS_IGNORE" , InputError::IGNORE );
+        envUpdate( "OPM_ERRORS_EXIT1", InputError::EXIT1);
+        envUpdate( "OPM_ERRORS_EXIT", InputError::EXIT1);
+        envUpdate( "OPM_ERRORS_DELAYED_EXIT1", InputError::DELAYED_EXIT1);
+        envUpdate( "OPM_ERRORS_DELAYED_EXIT", InputError::DELAYED_EXIT1);
     }
 
 
@@ -102,25 +114,49 @@ namespace Opm {
 
     void ParseContext::handleError(
             const std::string& errorKey,
-            const std::string& msg ) const {
+            const std::string& msg,
+            ErrorGuard& errors) const {
 
         InputError::Action action = get( errorKey );
 
-        if (action == InputError::WARN) {
-            OpmLog::warning(msg);
+        if (action == InputError::IGNORE) {
+            errors.addWarning(errorKey, msg);
             return;
         }
 
-        else if (action == InputError::THROW_EXCEPTION) {
+        if (action == InputError::WARN) {
+            OpmLog::warning(msg);
+            errors.addWarning(errorKey, msg);
+            return;
+        }
+
+        if (action == InputError::THROW_EXCEPTION) {
             OpmLog::error(msg);
+            // If we decide to throw immediately - we clear the error stack to
+            // make sure the error object does not terminate the application
+            // when it goes out of scope.
+            errors.clear();
             throw std::invalid_argument(errorKey + ": " + msg);
+        }
+
+        if (action == InputError::EXIT1) {
+            OpmLog::error(msg);
+            std::cerr << "A fatal error has occured and the application will stop." << std::endl;
+            std::cerr << msg << std::endl;
+            std::exit(1);
+        }
+
+        if (action == InputError::DELAYED_EXIT1) {
+            OpmLog::error(msg);
+            errors.addError(errorKey, msg);
+            return;
         }
     }
 
-    void ParseContext::handleUnknownKeyword(const std::string& keyword) const {
+    void ParseContext::handleUnknownKeyword(const std::string& keyword, ErrorGuard& errors) const {
         if (this->ignore_keywords.find(keyword) == this->ignore_keywords.end()) {
             std::string msg = "Unknown keyword: " + keyword;
-            this->handleError(ParseContext::PARSE_UNKNOWN_KEYWORD, msg);
+            this->handleError(ParseContext::PARSE_UNKNOWN_KEYWORD, msg, errors);
         }
     }
 
@@ -257,6 +293,7 @@ namespace Opm {
     const std::string ParseContext::PARSE_RANDOM_SLASH = "PARSE_RANDOM_SLASH";
     const std::string ParseContext::PARSE_MISSING_DIMS_KEYWORD = "PARSE_MISSING_DIMS_KEYWORD";
     const std::string ParseContext::PARSE_EXTRA_DATA = "PARSE_EXTRA_DATA";
+    const std::string ParseContext::PARSE_MISSING_SECTIONS = "PARSE_MISSING_SECTIONS";
     const std::string ParseContext::PARSE_MISSING_INCLUDE = "PARSE_MISSING_INCLUDE";
 
     const std::string ParseContext::UNSUPPORTED_SCHEDULE_GEO_MODIFIER = "UNSUPPORTED_SCHEDULE_GEO_MODIFIER";
@@ -266,12 +303,15 @@ namespace Opm {
 
     const std::string ParseContext::INTERNAL_ERROR_UNINITIALIZED_THPRES = "INTERNAL_ERROR_UNINITIALIZED_THPRES";
 
-    const std::string ParseContext::PARSE_MISSING_SECTIONS = "PARSE_MISSING_SECTIONS";
-
     const std::string ParseContext::SUMMARY_UNKNOWN_WELL  = "SUMMARY_UNKNOWN_WELL";
     const std::string ParseContext::SUMMARY_UNKNOWN_GROUP = "SUMMARY_UNKNOWN_GROUP";
+    const std::string ParseContext::SUMMARY_UNHANDLED_KEYWORD = "SUMMARY_UNHANDLED_KEYWORD";
+
+    const std::string ParseContext::RPT_MIXED_STYLE = "RPT_MIXED_STYLE";
+    const std::string ParseContext::RPT_UNKNOWN_MNEMONIC = "RPT_UNKNOWN_MNEMONIC";
 
     const std::string ParseContext::SCHEDULE_INVALID_NAME = "SCHEDULE_INVALID_NAME";
+    const std::string ParseContext::ACTIONX_ILLEGAL_KEYWORD = "ACTIONX_ILLEGAL_KEYWORD";
 }
 
 

@@ -28,19 +28,21 @@
 #include <opm/output/eclipse/AggregateWellData.hpp>
 #include <opm/output/eclipse/AggregateConnectionData.hpp>
 #include <opm/output/eclipse/AggregateMSWData.hpp>
-#include <opm/output/eclipse/SummaryState.hpp>
 #include <opm/output/eclipse/WriteRestartHelpers.hpp>
 
 #include <opm/output/eclipse/libECLRestart.hpp>
 
+#include <opm/parser/eclipse/EclipseState/Schedule/SummaryState.hpp>
 #include <opm/parser/eclipse/EclipseState/Grid/EclipseGrid.hpp>
 #include <opm/parser/eclipse/EclipseState/EclipseState.hpp>
 #include <opm/parser/eclipse/EclipseState/Schedule/Schedule.hpp>
 #include <opm/parser/eclipse/EclipseState/Schedule/Tuning.hpp>
+#include <opm/parser/eclipse/EclipseState/Schedule/Well.hpp>
 #include <opm/parser/eclipse/EclipseState/Tables/Eqldims.hpp>
 
 #include <algorithm>
 #include <cstddef>
+#include <iterator>
 #include <string>
 #include <unordered_set>
 #include <vector>
@@ -309,10 +311,10 @@ namespace {
                                            grpKeyToInd, fldKeyToInd,
 					   ecl_compatible_rst,
                                            simStep, sumState, ih);
-
         write_kw(rst_file, "IGRP", groupData.getIGroup());
         write_kw(rst_file, "SGRP", groupData.getSGroup());
         write_kw(rst_file, "XGRP", groupData.getXGroup());
+	write_kw(rst_file, "ZGRP", serialize_ZWEL(groupData.getZGroup()));
     }
 
     void writeMSWData(::Opm::RestartIO::ecl_rst_file_type* rst_file,
@@ -321,12 +323,13 @@ namespace {
                       const Schedule&                      schedule,
                       const EclipseGrid&                   grid,
 		      const Opm::SummaryState&             sumState,
+		      const Opm::data::Wells&              wells,
                       const std::vector<int>&              ih)
     {
         // write ISEG, RSEG, ILBS and ILBR to restart file
         const size_t simStep = static_cast<size_t> (sim_step);
         auto  MSWData = Helpers::AggregateMSWData(ih);
-        MSWData.captureDeclaredMSWData(schedule, simStep, units, ih, grid, sumState);
+        MSWData.captureDeclaredMSWData(schedule, simStep, units, ih, grid, sumState, wells);
 
         write_kw(rst_file, "ISEG", MSWData.getISeg());
         write_kw(rst_file, "ILBS", MSWData.getILBs());
@@ -378,8 +381,8 @@ namespace {
 
     void writeSolution(ecl_rst_file_type*  rst_file,
                        const RestartValue& value,
-		       const bool                ecl_compatible_rst,
-                       const bool                write_double)
+                       const bool                ecl_compatible_rst,
+                       const bool                write_double_arg)
     {
         ecl_rst_file_start_solution(rst_file);
 
@@ -397,7 +400,7 @@ namespace {
 
             if (elm.second.target == data::TargetType::RESTART_SOLUTION)
             {
-                write(elm.first, elm.second.data, write_double);
+                write(elm.first, elm.second.data, write_double_arg);
             }
         }
 
@@ -416,7 +419,7 @@ namespace {
 
         for (const auto& elm : value.solution) {
             if (elm.second.target == data::TargetType::RESTART_AUXILIARY) {
-                write(elm.first, elm.second.data, write_double);
+                write(elm.first, elm.second.data, write_double_arg);
             }
         }
     }
@@ -469,12 +472,31 @@ void save(const std::string&  filename,
     const auto inteHD = writeHeader(rst_file.get(), sim_step, report_step,
                                     seconds_elapsed, schedule, grid, es);
 
-    writeGroup(rst_file.get(), sim_step, ecl_compatible_rst, schedule, sumState, inteHD);
+    writeGroup(rst_file.get(), sim_step, ecl_compatible_rst,
+               schedule, sumState, inteHD);
 
-    writeMSWData(rst_file.get(), sim_step, units, schedule, grid, sumState, inteHD);
+    // Write well and MSW data only when applicable (i.e., when present)
+    {
+        const auto& wells = schedule.getWells(sim_step);
 
-    writeWell(rst_file.get(), sim_step, ecl_compatible_rst, es.runspec().phases(), units,
-              grid, schedule, value.wells, sumState, inteHD);
+        if (! wells.empty()) {
+            const auto numMSW =
+                std::count_if(std::begin(wells), std::end(wells),
+                    [sim_step](const Well* well)
+            {
+                return well->isMultiSegment(sim_step);
+            });
+
+            if (numMSW > 0) {
+                writeMSWData(rst_file.get(), sim_step, units,
+                             schedule, grid, sumState, value.wells, inteHD);
+            }
+
+            writeWell(rst_file.get(), sim_step, ecl_compatible_rst,
+                      es.runspec().phases(), units, grid, schedule,
+                      value.wells, sumState, inteHD);
+        }
+    }
 
     writeSolution(rst_file.get(), value, ecl_compatible_rst, write_double);
 

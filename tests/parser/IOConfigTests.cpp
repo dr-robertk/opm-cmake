@@ -25,7 +25,6 @@
 
 #include <opm/parser/eclipse/Deck/Deck.hpp>
 #include <opm/parser/eclipse/Parser/Parser.hpp>
-#include <opm/parser/eclipse/Parser/ParseContext.hpp>
 #include <opm/parser/eclipse/EclipseState/IOConfig/IOConfig.hpp>
 
 using namespace Opm;
@@ -167,7 +166,7 @@ BOOST_AUTO_TEST_CASE(DefaultProperties) {
                         "\n"
                         "SCHEDULE\n"
                         "RPTRST\n"
-                        "BASIC=1"
+                        "'BASIC = 1'"
                         "/\n"
                         "DATES\n"
                         " 22 MAY 1981 /\n"
@@ -185,11 +184,12 @@ BOOST_AUTO_TEST_CASE(DefaultProperties) {
                         " 26 MAY 1984 /\n"
                         " 26 MAY 1985 /\n"
                         " 27 MAY 1985 /\n"
-                        " 1 JAN 1986 /\n" 
+                        " 1 JAN 1986 /\n"
                        "/\n";
 
-    auto deck = Parser().parseString( data, ParseContext() );
+    auto deck = Parser().parseString( data);
     IOConfig ioConfig( deck );
+    RestartConfig rstConfig( deck);
 
     /*If no GRIDFILE nor NOGGF keywords are specified, default output an EGRID file*/
     BOOST_CHECK( ioConfig.getWriteEGRIDFile() );
@@ -222,7 +222,7 @@ BOOST_AUTO_TEST_CASE(OutputProperties) {
                         "SCHEDULE\n";
 
 
-    auto deck = Parser().parseString( data, ParseContext() );
+    auto deck = Parser().parseString( data );
     IOConfig ioConfig( deck );
 
     BOOST_CHECK( !ioConfig.getWriteEGRIDFile() );
@@ -244,7 +244,7 @@ BOOST_AUTO_TEST_CASE(NoGRIDFILE) {
                         " 0 0 /\n"
                         "\n";
 
-    auto deck = Parser().parseString( data, ParseContext() );
+    auto deck = Parser().parseString( data );
     IOConfig ioConfig( deck );
 
     /*If GRIDFILE 0 0 is specified, no EGRID file is written */
@@ -261,7 +261,7 @@ BOOST_AUTO_TEST_CASE(OutputPaths) {
     IOConfig config2( deck2 );
     std::string output_dir2 =  ".";
     BOOST_CHECK_EQUAL( output_dir2,  config2.getOutputDir() );
-    BOOST_CHECK_EQUAL( "testString", config2.getBaseName() );
+    BOOST_CHECK_EQUAL( "TESTSTRING", config2.getBaseName() );
 
     namespace fs = boost::filesystem;
 
@@ -270,8 +270,8 @@ BOOST_AUTO_TEST_CASE(OutputPaths) {
     IOConfig config3( deck3 );
     std::string output_dir3 =  "/path/to";
     config3.setOutputDir( output_dir3 );
-    auto testpath = fs::path( "/path/to/testString" ).make_preferred().string();
+    auto testpath = fs::path( "/path/to/TESTSTRING" ).make_preferred().string();
     BOOST_CHECK_EQUAL( output_dir3,  config3.getOutputDir() );
-    BOOST_CHECK_EQUAL( "testString", config3.getBaseName() );
+    BOOST_CHECK_EQUAL( "TESTSTRING", config3.getBaseName() );
     BOOST_CHECK_EQUAL( testpath, config3.fullBasePath() );
 }

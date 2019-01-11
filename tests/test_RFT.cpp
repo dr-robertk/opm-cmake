@@ -102,13 +102,12 @@ data::Solution createBlackoilState( int timeStepIdx, int numCells ) {
 }
 
 BOOST_AUTO_TEST_CASE(test_RFT) {
-    ParseContext parse_context;
     std::string eclipse_data_filename    = "testrft.DATA";
     test_work_area_type * test_area = test_work_area_alloc("test_RFT");
     test_work_area_copy_file( test_area, eclipse_data_filename.c_str() );
 
-    auto deck = Parser().parseFile( eclipse_data_filename, parse_context );
-    auto eclipseState = Parser::parse( deck );
+    auto deck = Parser().parseFile( eclipse_data_filename );
+    auto eclipseState = EclipseState(deck);
     {
         /* eclipseWriter is scoped here to ensure it is destroyed after the
          * file itself has been written, because we're going to reload it
@@ -118,8 +117,8 @@ BOOST_AUTO_TEST_CASE(test_RFT) {
 
         const auto& grid = eclipseState.getInputGrid();
         const auto numCells = grid.getCartesianSize( );
-        Schedule schedule(deck, grid, eclipseState.get3DProperties(), eclipseState.runspec().phases(), parse_context);
-        SummaryConfig summary_config( deck, schedule, eclipseState.getTableManager( ), parse_context);
+        Schedule schedule(deck, eclipseState);
+        SummaryConfig summary_config( deck, schedule, eclipseState.getTableManager( ));
         EclipseIO eclipseWriter( eclipseState, grid, schedule, summary_config );
         time_t start_time = schedule.posixStartTime();
         time_t step_time = ecl_util_make_date(10, 10, 2008 );
@@ -146,8 +145,11 @@ BOOST_AUTO_TEST_CASE(test_RFT) {
 
         Opm::data::Solution solution = createBlackoilState(2, numCells);
         Opm::data::Wells wells;
-        wells["OP_1"] = { r1, 1.0, 1.1, 3.1, 1, well1_comps };
-        wells["OP_2"] = { r2, 1.0, 1.1, 3.2, 1, well2_comps };
+
+        using SegRes = decltype(wells["w"].segments);
+
+        wells["OP_1"] = { r1, 1.0, 1.1, 3.1, 1, well1_comps, SegRes{} };
+        wells["OP_2"] = { r2, 1.0, 1.1, 3.2, 1, well2_comps, SegRes{} };
 
 
         RestartValue restart_value(solution, wells);
@@ -190,13 +192,12 @@ void verifyRFTFile2(const std::string& rft_filename) {
 
 
 BOOST_AUTO_TEST_CASE(test_RFT2) {
-    ParseContext parse_context;
     std::string eclipse_data_filename    = "testrft.DATA";
     test_work_area_type * test_area = test_work_area_alloc("test_RFT");
     test_work_area_copy_file( test_area, eclipse_data_filename.c_str());
 
-    auto deck = Parser().parseFile( eclipse_data_filename, parse_context );
-    auto eclipseState = Parser::parse( deck );
+    auto deck = Parser().parseFile( eclipse_data_filename);
+    auto eclipseState = EclipseState(deck);
     {
         /* eclipseWriter is scoped here to ensure it is destroyed after the
          * file itself has been written, because we're going to reload it
@@ -207,13 +208,13 @@ BOOST_AUTO_TEST_CASE(test_RFT2) {
         const auto& grid = eclipseState.getInputGrid();
         const auto numCells = grid.getCartesianSize( );
 
-        Schedule schedule(deck, grid, eclipseState.get3DProperties(), eclipseState.runspec().phases(), parse_context);
-        SummaryConfig summary_config( deck, schedule, eclipseState.getTableManager( ), parse_context);
-        EclipseIO eclipseWriter( eclipseState, grid, schedule, summary_config );
+        Schedule schedule(deck, eclipseState);
+        SummaryConfig summary_config( deck, schedule, eclipseState.getTableManager( ));
         time_t start_time = schedule.posixStartTime();
         const auto& time_map = schedule.getTimeMap( );
 
         for (int counter = 0; counter < 2; counter++) {
+            EclipseIO eclipseWriter( eclipseState, grid, schedule, summary_config );
             for (size_t step = 0; step < time_map.size(); step++) {
                 time_t step_time = time_map[step];
 
@@ -239,8 +240,11 @@ BOOST_AUTO_TEST_CASE(test_RFT2) {
 
                 Opm::data::Wells wells;
                 Opm::data::Solution solution = createBlackoilState(2, numCells);
-                wells["OP_1"] = { r1, 1.0, 1.1, 3.1, 1, well1_comps };
-                wells["OP_2"] = { r2, 1.0, 1.1, 3.2, 1, well2_comps };
+
+                using SegRes = decltype(wells["w"].segments);
+
+                wells["OP_1"] = { r1, 1.0, 1.1, 3.1, 1, well1_comps, SegRes{} };
+                wells["OP_2"] = { r2, 1.0, 1.1, 3.2, 1, well2_comps, SegRes{} };
 
                 RestartValue restart_value(solution, wells);
                 eclipseWriter.writeTimeStep( step,

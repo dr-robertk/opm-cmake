@@ -67,15 +67,6 @@ namespace Opm {
     }
 
 
-    MULTREGTRecord::MULTREGTRecord(int src, int target, double trans_mult, int directions, MULTREGT::NNCBehaviourEnum nnc_behaviour, const std::string& region_name) :
-        src_value(src),
-        target_value(target),
-        directions(directions),
-        trans_mult(trans_mult),
-        nnc_behaviour(nnc_behaviour),
-        region_name(region_name)
-    {}
-
 
     /*****************************************************************/
     /*
@@ -118,9 +109,14 @@ namespace Opm {
             if (e3DProps.hasDeckIntGridProperty( record->region_name)) {
                 int srcRegion    = record->src_value;
                 int targetRegion = record->target_value;
+
+                // the MULTREGT keyword is directional independent
+                // i.e. we add it both ways to the lookup map.
                 if (srcRegion != targetRegion) {
-                    std::pair<int,int> pair{ srcRegion, targetRegion };
-                    searchPairs[pair] = &(*record);
+                    std::pair<int,int> pair1{ srcRegion, targetRegion };
+                    std::pair<int,int> pair2{ targetRegion, srcRegion };
+                    searchPairs[pair1] = &(*record);
+                    searchPairs[pair2] = &(*record);
                 }
             }
             else
@@ -142,7 +138,7 @@ namespace Opm {
     }
 
 
-    void MULTREGTScanner::assertKeywordSupported( const DeckKeyword& deckKeyword, const std::string& defaultRegion) {
+    void MULTREGTScanner::assertKeywordSupported( const DeckKeyword& deckKeyword, const std::string& /* defaultRegion */) {
         for (const auto& deckRecord : deckKeyword) {
             const auto& srcItem = deckRecord.getItem("SRC_REGION");
             const auto& targetItem = deckRecord.getItem("TARGET_REGION");
@@ -194,7 +190,7 @@ namespace Opm {
 
             for (int src_region : src_regions) {
                 for (int target_region : target_regions)
-                    m_records.emplace_back(src_region, target_region, trans_mult, directions, nnc_behaviour, region_name);
+                    m_records.push_back({src_region, target_region, trans_mult, directions, nnc_behaviour, region_name});
             }
         }
 

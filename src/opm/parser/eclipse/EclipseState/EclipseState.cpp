@@ -49,13 +49,14 @@
 
 namespace Opm {
 
-    EclipseState::EclipseState(const Deck& deck, ParseContext parseContext) :
-        m_parseContext(      parseContext ),
+
+    EclipseState::EclipseState(const Deck& deck , const ParseContext& parseContext, ErrorGuard& errors) :
         m_tables(            deck ),
         m_runspec(           deck ),
-        m_eclipseConfig(     deck ),
+        m_eclipseConfig(     deck, parseContext, errors ),
         m_deckUnitSystem(    deck.getActiveUnitSystem() ),
         m_inputNnc(          deck ),
+        m_inputEditNnc(      deck ),
         m_inputGrid(         deck, nullptr ),
         m_eclipseProperties( deck, m_tables, m_inputGrid ),
         m_simulationConfig(  m_eclipseConfig.getInitConfig().restartRequested(), deck, m_eclipseProperties ),
@@ -77,6 +78,18 @@ namespace Opm {
         initTransMult();
         initFaults(deck);
     }
+
+
+    template<typename T>
+    EclipseState::EclipseState(const Deck& deck, const ParseContext& parseContext, T&& errors) :
+        EclipseState(deck, parseContext, errors)
+    {}
+
+
+    EclipseState::EclipseState(const Deck& deck) :
+        EclipseState(deck, ParseContext(), ErrorGuard())
+    {}
+
 
     const UnitSystem& EclipseState::getDeckUnitSystem() const {
         return m_deckUnitSystem;
@@ -112,9 +125,6 @@ namespace Opm {
         return m_tables;
     }
 
-    const ParseContext& EclipseState::getParseContext() const {
-        return m_parseContext;
-    }
 
     /// [[deprecated]] --- use cfg().io()
     const IOConfig& EclipseState::getIOConfig() const {
@@ -160,6 +170,13 @@ namespace Opm {
         return m_inputNnc.hasNNC();
     }
 
+    const EDITNNC& EclipseState::getInputEDITNNC() const {
+        return m_inputEditNnc;
+    }
+
+    bool EclipseState::hasInputEDITNNC() const {
+        return !m_inputEditNnc.empty();
+    }
     std::string EclipseState::getTitle() const {
         return m_title;
     }

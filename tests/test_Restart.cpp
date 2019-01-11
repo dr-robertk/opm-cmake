@@ -35,9 +35,10 @@
 #include <opm/parser/eclipse/EclipseState/Schedule/Schedule.hpp>
 #include <opm/parser/eclipse/EclipseState/SummaryConfig/SummaryConfig.hpp>
 #include <opm/parser/eclipse/EclipseState/Schedule/Well.hpp>
-#include <opm/parser/eclipse/Parser/ParseContext.hpp>
 #include <opm/parser/eclipse/Parser/Parser.hpp>
 #include <opm/parser/eclipse/Utility/Functional.hpp>
+#include <opm/parser/eclipse/EclipseState/Schedule/SummaryState.hpp>
+
 
 // ERT stuff
 #include <ert/ecl/ecl_kw.h>
@@ -412,7 +413,7 @@ RestartValue first_sim(const EclipseState& es, EclipseIO& eclWriter, bool write_
     auto num_cells = grid.getNumActive( );
 
     auto start_time = ecl_util_make_date( 1, 11, 1979 );
-    auto first_step = ecl_util_make_date( 10, 10, 2008 );
+    auto first_step = ecl_util_make_date( 1,  2, 2011 ); // Must be after 2011-01-20
 
     auto sol = mkSolution( num_cells );
     auto wells = mkWells();
@@ -460,12 +461,12 @@ struct Setup {
     Schedule schedule;
     SummaryConfig summary_config;
 
-    Setup( const char* path, const ParseContext& parseContext = ParseContext( )) :
-        deck( Parser().parseFile( path, parseContext ) ),
-        es( deck, parseContext ),
+    Setup( const char* path) :
+        deck( Parser().parseFile( path) ),
+        es( deck),
         grid( es.getInputGrid( ) ),
-        schedule( deck, grid, es.get3DProperties(), es.runspec().phases(), parseContext),
-        summary_config( deck, schedule, es.getTableManager( ), parseContext)
+        schedule( deck, grid, es.get3DProperties(), es.runspec()),
+        summary_config( deck, schedule, es.getTableManager( ))
     {
         auto& io_config = es.getIOConfig();
         io_config.setEclCompatibleRST(false);

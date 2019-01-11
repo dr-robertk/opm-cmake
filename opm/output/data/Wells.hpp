@@ -20,12 +20,14 @@
 #ifndef OPM_OUTPUT_WELLS_HPP
 #define OPM_OUTPUT_WELLS_HPP
 
+#include <algorithm>
+#include <cstddef>
 #include <initializer_list>
 #include <map>
-#include <algorithm>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <unordered_map>
 #include <vector>
 
 namespace Opm {
@@ -56,6 +58,12 @@ namespace Opm {
                 reservoir_water   = (1 << 8),
                 reservoir_oil     = (1 << 9),
                 reservoir_gas     = (1 << 10),
+                productivity_index_water = (1 << 11),
+                productivity_index_oil   = (1 << 12),
+                productivity_index_gas   = (1 << 13),
+                well_potential_water   = (1 << 14),
+                well_potential_oil     = (1 << 15),
+                well_potential_gas     = (1 << 16),
             };
 
             using enum_size = std::underlying_type< opt >::type;
@@ -99,6 +107,12 @@ namespace Opm {
             double reservoir_water = 0.0;
             double reservoir_oil = 0.0;
             double reservoir_gas = 0.0;
+            double productivity_index_water = 0.0;
+            double productivity_index_oil = 0.0;
+            double productivity_index_gas = 0.0;
+            double well_potential_water = 0.0;
+            double well_potential_oil = 0.0;
+            double well_potential_gas = 0.0;
     };
 
     struct Connection {
@@ -120,6 +134,18 @@ namespace Opm {
         void read(MessageBufferType& buffer);
     };
 
+    struct Segment {
+        Rates rates;
+        double pressure;
+        std::size_t segNumber;
+
+        template <class MessageBufferType>
+        void write(MessageBufferType& buffer) const;
+
+        template <class MessageBufferType>
+        void read(MessageBufferType& buffer);
+    };
+
     struct Well {
         Rates rates;
         double bhp;
@@ -127,7 +153,7 @@ namespace Opm {
         double temperature;
         int control;
         std::vector< Connection > connections;
-
+        std::unordered_map<std::size_t, Segment> segments;
         inline bool flowing() const noexcept;
         template <class MessageBufferType>
         void write(MessageBufferType& buffer) const;
@@ -249,6 +275,12 @@ namespace Opm {
             case opt::reservoir_water: return this->reservoir_water;
             case opt::reservoir_oil: return this->reservoir_oil;
             case opt::reservoir_gas: return this->reservoir_gas;
+            case opt::productivity_index_water: return this->productivity_index_water;
+            case opt::productivity_index_oil: return this->productivity_index_oil;
+            case opt::productivity_index_gas: return this->productivity_index_gas;
+            case opt::well_potential_water: return this->well_potential_water;
+            case opt::well_potential_oil: return this->well_potential_oil;
+            case opt::well_potential_gas: return this->well_potential_gas;
         }
 
         throw std::invalid_argument(
@@ -286,6 +318,12 @@ namespace Opm {
             buffer.write(this->reservoir_water);
             buffer.write(this->reservoir_oil);
             buffer.write(this->reservoir_gas);
+            buffer.write(this->productivity_index_water);
+            buffer.write(this->productivity_index_oil);
+            buffer.write(this->productivity_index_gas);
+            buffer.write(this->well_potential_water);
+            buffer.write(this->well_potential_oil);
+            buffer.write(this->well_potential_gas);
     }
 
     template <class MessageBufferType>
@@ -301,6 +339,13 @@ namespace Opm {
     }
 
     template <class MessageBufferType>
+    void Segment::write(MessageBufferType& buffer) const {
+        buffer.write(this->segNumber);
+        this->rates.write(buffer);
+        buffer.write(this->pressure);
+    }
+
+    template <class MessageBufferType>
     void Well::write(MessageBufferType& buffer) const {
         this->rates.write(buffer);
         buffer.write(this->bhp);
@@ -311,6 +356,16 @@ namespace Opm {
         buffer.write(size);
         for (const Connection& comp : this->connections)
             comp.write(buffer);
+
+        {
+            const auto nSeg =
+                static_cast<unsigned int>(this->segments.size());
+            buffer.write(nSeg);
+
+            for (const auto& seg : this->segments) {
+                seg.second.write(buffer);
+            }
+        }
     }
 
     template <class MessageBufferType>
@@ -327,6 +382,12 @@ namespace Opm {
             buffer.read(this->reservoir_water);
             buffer.read(this->reservoir_oil);
             buffer.read(this->reservoir_gas);
+            buffer.read(this->productivity_index_water);
+            buffer.read(this->productivity_index_oil);
+            buffer.read(this->productivity_index_gas);
+            buffer.read(this->well_potential_water);
+            buffer.read(this->well_potential_oil);
+            buffer.read(this->well_potential_gas);
     }
 
   template <class MessageBufferType>
@@ -342,12 +403,21 @@ namespace Opm {
    }
 
     template <class MessageBufferType>
+    void Segment::read(MessageBufferType& buffer) {
+        buffer.read(this->segNumber);
+        this->rates.read(buffer);
+        buffer.read(this->pressure);
+    }
+
+    template <class MessageBufferType>
     void Well::read(MessageBufferType& buffer) {
         this->rates.read(buffer);
         buffer.read(this->bhp);
         buffer.read(this->thp);
         buffer.read(this->temperature);
         buffer.read(this->control);
+
+        // Connection information
         unsigned int size = 0.0; //this->connections.size();
         buffer.read(size);
         this->connections.resize(size);
@@ -356,9 +426,25 @@ namespace Opm {
             auto& comp = this->connections[ i ];
             comp.read(buffer);
         }
+
+        // Segment information (if applicable)
+        const auto nSeg = [&buffer]() -> unsigned int
+        {
+            auto n = 0u;
+            buffer.read(n);
+
+            return n;
+        }();
+
+        for (auto segID = 0*nSeg; segID < nSeg; ++segID) {
+            auto seg = Segment{};
+            seg.read(buffer);
+
+            const auto segNumber = seg.segNumber;
+            this->segments.emplace(segNumber, std::move(seg));
+        }
     }
 
-}
-}
+}} // Opm::data
 
 #endif //OPM_OUTPUT_WELLS_HPP

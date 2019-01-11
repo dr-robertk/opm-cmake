@@ -36,7 +36,7 @@
 #include <opm/parser/eclipse/EclipseState/Schedule/Well.hpp>
 #include <opm/parser/eclipse/EclipseState/SummaryConfig/SummaryConfig.hpp>
 
-#include <ert/ecl/ecl_smspec.h>
+#include <ert/ecl/ecl_smspec.hpp>
 
 #include <iostream>
 #include <algorithm>
@@ -123,67 +123,55 @@ namespace {
 
 
 
-void handleMissingWell( const ParseContext& parseContext , const std::string& keyword, const std::string& well) {
+void handleMissingWell( const ParseContext& parseContext, ErrorGuard& errors, const std::string& keyword, const std::string& well) {
     std::string msg = std::string("Error in keyword:") + keyword + std::string(" No such well: ") + well;
     if (parseContext.get( ParseContext::SUMMARY_UNKNOWN_WELL) == InputError::WARN)
         std::cerr << "ERROR: " << msg << std::endl;
 
-    parseContext.handleError( ParseContext::SUMMARY_UNKNOWN_WELL , msg );
+    parseContext.handleError( ParseContext::SUMMARY_UNKNOWN_WELL , msg, errors );
 }
 
 
-void handleMissingGroup( const ParseContext& parseContext , const std::string& keyword, const std::string& group) {
+void handleMissingGroup( const ParseContext& parseContext , ErrorGuard& errors, const std::string& keyword, const std::string& group) {
     std::string msg = std::string("Error in keyword:") + keyword + std::string(" No such group: ") + group;
     if (parseContext.get( ParseContext::SUMMARY_UNKNOWN_GROUP) == InputError::WARN)
         std::cerr << "ERROR: " << msg << std::endl;
 
-    parseContext.handleError( ParseContext::SUMMARY_UNKNOWN_GROUP , msg );
+    parseContext.handleError( ParseContext::SUMMARY_UNKNOWN_GROUP , msg, errors );
 }
 
-  inline void keywordW( SummaryConfig::keyword_list& list,
+inline void keywordW( SummaryConfig::keyword_list& list,
                       const ParseContext& parseContext,
+                      ErrorGuard& errors,
                       const DeckKeyword& keyword,
                       const Schedule& schedule ) {
 
     const auto hasValue = []( const DeckKeyword& kw ) {
         return kw.getDataRecord().getDataItem().hasValue( 0 );
     };
-    const std::array<int,3> dummy_dims = {1,1,1};
 
     if (keyword.size() && hasValue(keyword)) {
         for( const std::string& pattern : keyword.getStringData()) {
             auto wells = schedule.getWellsMatching( pattern );
 
             if( wells.empty() )
-                handleMissingWell( parseContext, keyword.name(), pattern );
+                handleMissingWell( parseContext, errors, keyword.name(), pattern );
 
             for( const auto* well : wells )
-                list.push_back( SummaryConfig::keyword_type( smspec_node_alloc( ECL_SMSPEC_WELL_VAR,
-                                                                                well->name().c_str(),
-                                                                                keyword.name().c_str(),
-                                                                                "",
-                                                                                ":",
-                                                                                dummy_dims.data(),
-                                                                                0,0,0)));
+                list.push_back( SummaryConfig::keyword_type( keyword.name(), well->name() ));
         }
     } else
         for (const auto* well : schedule.getWells())
-            list.push_back( SummaryConfig::keyword_type( smspec_node_alloc( ECL_SMSPEC_WELL_VAR,
-                                                                            well->name().c_str(),
-                                                                            keyword.name().c_str(),
-                                                                            "",
-                                                                            ":",
-                                                                            dummy_dims.data(),
-                                                                            0,0,0)));
+            list.push_back( SummaryConfig::keyword_type( keyword.name(),  well->name()));
   }
 
 
 inline void keywordG( SummaryConfig::keyword_list& list,
                       const ParseContext& parseContext,
+                      ErrorGuard& errors,
                       const DeckKeyword& keyword,
                       const Schedule& schedule ) {
 
-    const std::array<int,3> dummy_dims = {1,1,1};
     if( keyword.name() == "GMWSET" ) return;
 
     if( keyword.size() == 0 ||
@@ -191,13 +179,7 @@ inline void keywordG( SummaryConfig::keyword_list& list,
 
         for( const auto& group : schedule.getGroups() ) {
             if( group->name() == "FIELD" ) continue;
-            list.push_back( SummaryConfig::keyword_type( smspec_node_alloc( ECL_SMSPEC_GROUP_VAR,
-                                                                            group->name().c_str(),
-                                                                            keyword.name().c_str(),
-                                                                            "",
-                                                                            ":",
-                                                                            dummy_dims.data(),
-                                                                            0, 0, 0)));
+            list.push_back( SummaryConfig::keyword_type(keyword.name(), group->name() ));
         }
         return;
     }
@@ -206,33 +188,17 @@ inline void keywordG( SummaryConfig::keyword_list& list,
 
     for( const std::string& group : item.getData< std::string >() ) {
         if( schedule.hasGroup( group ) )
-            list.push_back( SummaryConfig::keyword_type( smspec_node_alloc( ECL_SMSPEC_GROUP_VAR,
-                                                                            group.c_str(),
-                                                                            keyword.name().c_str(),
-                                                                            "",
-                                                                            ":",
-                                                                            dummy_dims.data(),
-                                                                            0, 0, 0)));
-
-
+            list.push_back( SummaryConfig::keyword_type(keyword.name(), group ));
         else
-            handleMissingGroup( parseContext, keyword.name(), group );
+            handleMissingGroup( parseContext, errors, keyword.name(), group );
     }
 }
 
-  inline void keywordF( SummaryConfig::keyword_list& list,
-                        const DeckKeyword& keyword ) {
-      const std::array<int,3> dummy_dims = {1,1,1};
-      if( keyword.name() == "FMWSET" ) return;
-      list.push_back( SummaryConfig::keyword_type( smspec_node_alloc( ECL_SMSPEC_FIELD_VAR,
-                                                                      NULL,
-                                                                      keyword.name().c_str(),
-                                                                      "",
-                                                                      ":",
-                                                                      dummy_dims.data(),
-                                                                      0, 0, 0)));
-
-  }
+inline void keywordF( SummaryConfig::keyword_list& list,
+                      const DeckKeyword& keyword ) {
+    if( keyword.name() == "FMWSET" ) return;
+    list.push_back( SummaryConfig::keyword_type( keyword.name() ));
+}
 
 inline std::array< int, 3 > getijk( const DeckRecord& record,
                                     int offset = 0 ) {
@@ -247,27 +213,30 @@ inline std::array< int, 3 > getijk( const Connection& completion ) {
     return { { completion.getI(), completion.getJ(), completion.getK() }};
 }
 
-  inline void keywordB( SummaryConfig::keyword_list& list,
-                        const DeckKeyword& keyword,
-                        const GridDims& dims) {
-    for( const auto& record : keyword ) {
-        auto ijk = getijk( record );
-        int global_index = 1 + dims.getGlobalIndex(ijk[0], ijk[1], ijk[2]);
-        list.push_back( SummaryConfig::keyword_type( smspec_node_alloc(ECL_SMSPEC_BLOCK_VAR,
-                                                                       NULL,
-                                                                       keyword.name().c_str(),
-                                                                       "",
-                                                                       ":",
-                                                                       dims.getNXYZ().data(),
-                                                                       global_index,0,0)));
 
-    }
+inline void keywordB( SummaryConfig::keyword_list& list,
+                      const DeckKeyword& keyword,
+                      const GridDims& dims) {
+  for( const auto& record : keyword ) {
+      auto ijk = getijk( record );
+      int global_index = 1 + dims.getGlobalIndex(ijk[0], ijk[1], ijk[2]);
+      list.push_back( SummaryConfig::keyword_type( keyword.name(), global_index, dims.getNXYZ().data() ));
+  }
 }
+
+inline void keywordR2R( SummaryConfig::keyword_list& /* list */,
+                        const ParseContext& parseContext,
+                        ErrorGuard& errors,
+                        const DeckKeyword& keyword)
+{
+    std::string msg = "OPM/flow does not support region to region summary keywords - " + keyword.name() + " is ignored.";
+    parseContext.handleError(ParseContext::SUMMARY_UNHANDLED_KEYWORD, msg, errors);
+}
+
 
   inline void keywordR( SummaryConfig::keyword_list& list,
                       const DeckKeyword& keyword,
-                      const TableManager& tables,
-                      const GridDims& dims) {
+                      const TableManager& tables) {
 
     /* RUNSUM is not a region keyword but a directive for how to format and
      * print output. Unfortunately its *recognised* as a region keyword
@@ -289,38 +258,24 @@ inline std::array< int, 3 > getijk( const Connection& completion ) {
 
     for( const int region : regions ) {
         if (region >= 1 && region <= static_cast<int>(numfip))
-            list.push_back( SummaryConfig::keyword_type( smspec_node_alloc( ECL_SMSPEC_REGION_VAR,
-                                                                            NULL,
-                                                                            keyword.name().c_str(),
-                                                                            "",
-                                                                            ":",
-                                                                            dims.getNXYZ().data(),
-                                                                            region,
-                                                                            0, 0)));
+            list.push_back( SummaryConfig::keyword_type( keyword.name(), region ));
         else
             throw std::invalid_argument("Illegal region value: " + std::to_string( region ));
     }
 }
 
 
-  inline void keywordMISC( SummaryConfig::keyword_list& list,
+inline void keywordMISC( SummaryConfig::keyword_list& list,
                            const DeckKeyword& keyword)
 {
-    const std::array<int,3> dummy_dims = {1,1,1};
     if (meta_keywords.count( keyword.name() ) == 0)
-        list.push_back( SummaryConfig::keyword_type( smspec_node_alloc( ECL_SMSPEC_MISC_VAR,
-                                                                        NULL,
-                                                                        keyword.name().c_str(),
-                                                                        "",
-                                                                        ":",
-                                                                        dummy_dims.data(),
-                                                                        0,
-                                                                        0, 0)));
+        list.push_back( SummaryConfig::keyword_type( keyword.name() ));
 }
 
 
   inline void keywordC( SummaryConfig::keyword_list& list,
                         const ParseContext& parseContext,
+                        ErrorGuard& errors,
                         const DeckKeyword& keyword,
                         const Schedule& schedule,
                         const GridDims& dims) {
@@ -337,7 +292,7 @@ inline std::array< int, 3 > getijk( const Connection& completion ) {
                          : schedule.getWellsMatching( wellitem.getTrimmedString( 0 ) );
 
         if( wells.empty() )
-            handleMissingWell( parseContext, keyword.name(), wellitem.getTrimmedString( 0 ) );
+            handleMissingWell( parseContext, errors, keyword.name(), wellitem.getTrimmedString( 0 ) );
 
         for( const auto* well : wells ) {
             const auto& name = well->name();
@@ -353,27 +308,13 @@ inline std::array< int, 3 > getijk( const Connection& completion ) {
 
                 if( record.getItem( 1 ).defaultApplied( 0 ) ) {
                     int global_index = 1 + dims.getGlobalIndex(cijk[0], cijk[1], cijk[2]);
-                    list.push_back( SummaryConfig::keyword_type( smspec_node_alloc( ECL_SMSPEC_COMPLETION_VAR,
-                                                                                    name.c_str(),
-                                                                                    keywordstring.c_str(),
-                                                                                    "",
-                                                                                    ":",
-                                                                                    dims.getNXYZ().data(),
-                                                                                    global_index,
-                                                                                    0, 0)));
+                    list.push_back( SummaryConfig::keyword_type( keywordstring, name.c_str(), global_index, dims.getNXYZ().data()));
                 } else {
                     /* block coordinates specified */
                     auto recijk = getijk( record, 1 );
                     if( std::equal( recijk.begin(), recijk.end(), cijk.begin() ) ) {
                         int global_index = 1 + dims.getGlobalIndex(recijk[0], recijk[1], recijk[2]);
-                        list.push_back( SummaryConfig::keyword_type( smspec_node_alloc( ECL_SMSPEC_COMPLETION_VAR,
-                                                                                        name.c_str(),
-                                                                                        keywordstring.c_str(),
-                                                                                        "",
-                                                                                        ":",
-                                                                                        dims.getNXYZ().data(),
-                                                                                        global_index,
-                                                                                        0, 0)));
+                        list.push_back(SummaryConfig::keyword_type( keywordstring, name.c_str(), global_index, dims.getNXYZ().data()));
                     }
                 }
             }
@@ -381,36 +322,243 @@ inline std::array< int, 3 > getijk( const Connection& completion ) {
     }
 }
 
+    bool isKnownSegmentKeyword(const DeckKeyword& keyword)
+    {
+        const auto& kw = keyword.name();
+
+        if (kw.size() > 4) {
+            // Easy check first--handles SUMMARY and SUMTHIN &c.
+            return false;
+        }
+
+        const auto kw_whitelist = std::vector<const char*> {
+            "SOFR", "SGFR", "SWFR", "SPR",
+        };
+
+        return std::any_of(kw_whitelist.begin(), kw_whitelist.end(),
+                           [&kw](const char* known) -> bool
+                           {
+                               return kw == known;
+                           });
+    }
+
+    bool isMultiSegmentWell(const std::size_t last_timestep,
+                            const Well*       well)
+    {
+        for (auto step  = 0*last_timestep;
+                  step <=   last_timestep; ++step)
+        {
+            if (well->isMultiSegment(step)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    int maxNumWellSegments(const std::size_t last_timestep,
+                           const Well*       well)
+    {
+        auto numSeg = 0;
+
+        for (auto step  = 0*last_timestep;
+                  step <=   last_timestep; ++step)
+        {
+            if (! well->isMultiSegment(step)) {
+                continue;
+            }
+
+            const auto nseg =
+                well->getWellSegments(last_timestep).size();
+
+            if (nseg > numSeg) {
+                numSeg = nseg;
+            }
+        }
+
+        return numSeg;
+    }
+
+    void makeSegmentNodes(const std::size_t               last_timestep,
+                          const int                       segID,
+                          const DeckKeyword&              keyword,
+                          const std::vector<const Well*>& wells,
+                          SummaryConfig::keyword_list&    list)
+    {
+        // Modifies 'list' in place.
+        auto makeNode = [&keyword, &list]
+            (const std::string& well, const int segNumber)
+        {
+            list.push_back(SummaryConfig::keyword_type( keyword.name(), well, segNumber ));
+        };
+
+        for (const auto* well : wells) {
+            if (! isMultiSegmentWell(last_timestep, well)) {
+                // Not an MSW.  Don't create summary vectors for segments.
+                continue;
+            }
+
+            const auto& wname = well->name();
+            if (segID < 1) {
+                // Segment number defaulted.  Allocate a summary
+                // vector for each segment.
+                const auto nSeg = maxNumWellSegments(last_timestep, well);
+
+                for (auto segNumber = 0*nSeg;
+                          segNumber <   nSeg; ++segNumber)
+                {
+                    // One-based segment number.
+                    makeNode(wname, segNumber + 1);
+                }
+            }
+            else {
+                // Segment number specified.  Allocate single
+                // summary vector for that segment number.
+                makeNode(wname, segID);
+            }
+        }
+    }
+
+    void keywordSNoRecords(const std::size_t            last_timestep,
+                           const DeckKeyword&           keyword,
+                           const Schedule&              schedule,
+                           SummaryConfig::keyword_list& list)
+    {
+        // No keyword records.  Allocate summary vectors for all
+        // segments in all wells at all times.
+        //
+        // Expected format:
+        //
+        //   SGFR
+        //   / -- All segments in all MS wells at all times.
+
+        const auto segID = -1;
+
+        makeSegmentNodes(last_timestep, segID, keyword,
+                         schedule.getWells(), list);
+    }
+
+    void keywordSWithRecords(const std::size_t            last_timestep,
+                             const ParseContext&          parseContext,
+                             ErrorGuard& errors,
+                             const DeckKeyword&           keyword,
+                             const Schedule&              schedule,
+                             SummaryConfig::keyword_list& list)
+    {
+        // Keyword has explicit records.  Process those and create
+        // segment-related summary vectors for those wells/segments
+        // that match the description.
+        //
+        // Expected formats:
+        //
+        //   SOFR
+        //     'W1'   1 /
+        //     'W1'  10 /
+        //     'W3'     / -- All segments
+        //   /
+        //
+        //   SPR
+        //     1*   2 / -- Segment 2 in all multi-segmented wells
+        //   /
+
+        for (const auto& record : keyword) {
+            const auto& wellitem = record.getItem(0);
+            const auto& wells    = wellitem.defaultApplied(0)
+                ? schedule.getWells()
+                : schedule.getWellsMatching(wellitem.getTrimmedString(0));
+
+            if (wells.empty()) {
+                handleMissingWell(parseContext, errors, keyword.name(),
+                                  wellitem.getTrimmedString(0));
+            }
+
+            // Negative 1 (< 0) if segment ID defaulted.  Defaulted
+            // segment number in record implies all segments.
+            const auto segID = record.getItem(1).defaultApplied(0)
+                ? -1 : record.getItem(1).get<int>(0);
+
+            makeSegmentNodes(last_timestep, segID, keyword, wells, list);
+        }
+    }
+
+    inline void keywordS(SummaryConfig::keyword_list& list,
+                         const ParseContext&          parseContext,
+                         ErrorGuard& errors,
+                         const DeckKeyword&           keyword,
+                         const Schedule&              schedule)
+    {
+        // Generate SMSPEC nodes for SUMMARY keywords of the form
+        //
+        //   SOFR
+        //     'W1'   1 /
+        //     'W1'  10 /
+        //     'W3'     / -- All segments
+        //   /
+        //
+        //   SPR
+        //     1*   2 / -- Segment 2 in all multi-segmented wells
+        //   /
+        //
+        //   SGFR
+        //   / -- All segments in all MS wells at all times.
+
+        if (! isKnownSegmentKeyword(keyword)) {
+            // Ignore keywords that have not been explicitly white-listed
+            // for treatment as segment summary vectors.
+            return;
+        }
+
+        const auto last_timestep = schedule.getTimeMap().last();
+
+        if (keyword.size() > 0) {
+            // Keyword with explicit records.
+            // Handle as alternatives SOFR and SPR above
+            keywordSWithRecords(last_timestep, parseContext, errors,
+                                keyword, schedule, list);
+        }
+        else {
+            // Keyword with no explicit records.
+            // Handle as alternative SGFR above.
+            keywordSNoRecords(last_timestep, keyword, schedule, list);
+        }
+    }
+
   inline void handleKW( SummaryConfig::keyword_list& list,
                         const DeckKeyword& keyword,
                         const Schedule& schedule,
                         const TableManager& tables,
                         const ParseContext& parseContext,
+                        ErrorGuard& errors,
                         const GridDims& dims) {
     const auto var_type = ecl_smspec_identify_var_type( keyword.name().c_str() );
 
     switch( var_type ) {
-        case ECL_SMSPEC_WELL_VAR: return keywordW( list, parseContext, keyword, schedule );
-        case ECL_SMSPEC_GROUP_VAR: return keywordG( list, parseContext, keyword, schedule );
+        case ECL_SMSPEC_WELL_VAR: return keywordW( list, parseContext, errors, keyword, schedule );
+        case ECL_SMSPEC_GROUP_VAR: return keywordG( list, parseContext, errors, keyword, schedule );
         case ECL_SMSPEC_FIELD_VAR: return keywordF( list, keyword );
         case ECL_SMSPEC_BLOCK_VAR: return keywordB( list, keyword, dims );
-        case ECL_SMSPEC_REGION_VAR: return keywordR( list, keyword, tables, dims );
-        case ECL_SMSPEC_COMPLETION_VAR: return keywordC( list, parseContext, keyword, schedule, dims);
+        case ECL_SMSPEC_REGION_VAR: return keywordR( list, keyword, tables );
+        case ECL_SMSPEC_REGION_2_REGION_VAR: return keywordR2R(list, parseContext, errors, keyword);
+        case ECL_SMSPEC_COMPLETION_VAR: return keywordC( list, parseContext, errors, keyword, schedule, dims);
+        case ECL_SMSPEC_SEGMENT_VAR: return keywordS( list, parseContext, errors, keyword, schedule );
         case ECL_SMSPEC_MISC_VAR: return keywordMISC( list, keyword );
 
-        default: return;
+        default:
+            std::string msg = "Summary keywords of type: " + std::string(ecl_smspec_get_var_type_name( var_type )) + " is not supported. Keyword: " + keyword.name() + " is ignored";
+            parseContext.handleError(ParseContext::SUMMARY_UNHANDLED_KEYWORD, msg, errors);
+            return;
     }
 }
 
   inline void uniq( SummaryConfig::keyword_list& vec ) {
     const auto lt = []( const SummaryConfig::keyword_type& lhs,
                         const SummaryConfig::keyword_type& rhs ) {
-        return smspec_node_cmp(lhs.get(), rhs.get()) < 0;
+        return lhs.cmp(rhs) < 0;
     };
 
     const auto eq = []( const SummaryConfig::keyword_type& lhs,
                         const SummaryConfig::keyword_type& rhs ) {
-        return smspec_node_equal(lhs.get(), rhs.get());
+        return lhs.cmp(rhs) == 0;
     };
 
     std::sort( vec.begin(), vec.end(), lt );
@@ -423,27 +571,28 @@ SummaryConfig::SummaryConfig( const Deck& deck,
                               const Schedule& schedule,
                               const TableManager& tables,
                               const ParseContext& parseContext,
+                              ErrorGuard& errors,
                               const GridDims& dims) {
     SUMMARYSection section( deck );
     for( auto& x : section )
-        handleKW( this->keywords, x, schedule, tables, parseContext, dims);
+        handleKW( this->keywords, x, schedule, tables, parseContext, errors, dims);
 
     if( section.hasKeyword( "ALL" ) )
-        this->merge( { ALL_keywords, schedule, tables, parseContext, dims} );
+        this->merge( { ALL_keywords, schedule, tables, parseContext, errors, dims} );
 
     if( section.hasKeyword( "GMWSET" ) )
-        this->merge( { GMWSET_keywords, schedule, tables, parseContext, dims} );
+        this->merge( { GMWSET_keywords, schedule, tables, parseContext, errors, dims} );
 
     if( section.hasKeyword( "FMWSET" ) )
-        this->merge( { FMWSET_keywords, schedule, tables, parseContext, dims} );
+        this->merge( { FMWSET_keywords, schedule, tables, parseContext, errors, dims} );
 
     if (section.hasKeyword( "PERFORMA" ) )
-        this->merge( { PERFORMA_keywords, schedule, tables, parseContext, dims} );
+        this->merge( { PERFORMA_keywords, schedule, tables, parseContext, errors, dims} );
 
     uniq( this->keywords );
     for (const auto& kw: this->keywords) {
-        this->short_keywords.insert( smspec_node_get_keyword( kw.get() ));
-        this->summary_keywords.insert( smspec_node_get_gen_key1( kw.get() ));
+        this->short_keywords.insert( kw.keyword() );
+        this->summary_keywords.insert( kw.gen_key() );
     }
 
 }
@@ -451,11 +600,29 @@ SummaryConfig::SummaryConfig( const Deck& deck,
 SummaryConfig::SummaryConfig( const Deck& deck,
                               const Schedule& schedule,
                               const TableManager& tables,
-                              const ParseContext& parseContext) :
-    SummaryConfig( deck , schedule, tables, parseContext, GridDims( deck ))
-{
+                              const ParseContext& parseContext,
+                              ErrorGuard& errors) :
+    SummaryConfig( deck , schedule, tables, parseContext, errors, GridDims( deck ))
+{ }
 
-}
+
+template <typename T>
+SummaryConfig::SummaryConfig( const Deck& deck,
+                              const Schedule& schedule,
+                              const TableManager& tables,
+                              const ParseContext& parseContext,
+                              T&& errors) :
+    SummaryConfig(deck, schedule, tables, parseContext, errors)
+{}
+
+
+SummaryConfig::SummaryConfig( const Deck& deck,
+               const Schedule& schedule,
+               const TableManager& tables) :
+    SummaryConfig(deck, schedule, tables, ParseContext(), ErrorGuard())
+{}
+
+
 
 SummaryConfig::const_iterator SummaryConfig::begin() const {
     return this->keywords.cbegin();

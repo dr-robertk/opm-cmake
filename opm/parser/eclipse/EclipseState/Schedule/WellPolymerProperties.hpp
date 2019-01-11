@@ -26,6 +26,9 @@ namespace Opm {
     struct WellPolymerProperties {
         double m_polymerConcentration;
         double m_saltConcentration;
+        int m_plymwinjtable;
+        int m_skprwattable;
+        int m_skprpolytable;
 
         bool operator==(const WellPolymerProperties& other) const;
         bool operator!=(const WellPolymerProperties& other) const;

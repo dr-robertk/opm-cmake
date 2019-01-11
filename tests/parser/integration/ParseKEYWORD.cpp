@@ -29,6 +29,8 @@
 #include <opm/parser/eclipse/EclipseState/Tables/TlpmixpaTable.hpp>
 #include <opm/parser/eclipse/Parser/Parser.hpp>
 #include <opm/parser/eclipse/Units/Units.hpp>
+#include <opm/parser/eclipse/Parser/ParseContext.hpp>
+#include <opm/parser/eclipse/Parser/ErrorGuard.hpp>
 
 using namespace Opm;
 
@@ -71,7 +73,7 @@ GRID
 BOOST_AUTO_TEST_CASE( DENSITY ) {
     Parser parser;
     std::string file(pathprefix() + "DENSITY/DENSITY1");
-    auto deck =  parser.parseFile(file, ParseContext());
+    auto deck =  parser.parseFile(file);
     const auto& densityKw = deck.getKeyword("DENSITY" , 0);
 
 
@@ -91,7 +93,7 @@ BOOST_AUTO_TEST_CASE( DENSITY ) {
 BOOST_AUTO_TEST_CASE( END ) {
     Parser parser;
     std::string fileWithTitleKeyword = pathprefix() + "END/END1.txt";
-    auto deck = parser.parseFile(fileWithTitleKeyword, ParseContext());
+    auto deck = parser.parseFile(fileWithTitleKeyword);
 
     BOOST_CHECK_EQUAL(size_t(1), deck.size());
     BOOST_CHECK_EQUAL(true,  deck.hasKeyword("OIL"));
@@ -102,7 +104,7 @@ BOOST_AUTO_TEST_CASE( END ) {
 BOOST_AUTO_TEST_CASE( ENDINC ) {
     Parser parser;
     std::string fileWithTitleKeyword(pathprefix() + "END/ENDINC1.txt");
-    auto deck = parser.parseFile(fileWithTitleKeyword, ParseContext());
+    auto deck = parser.parseFile(fileWithTitleKeyword);
 
     BOOST_CHECK_EQUAL(size_t(1), deck.size());
     BOOST_CHECK_EQUAL(true,  deck.hasKeyword("OIL"));
@@ -112,11 +114,12 @@ BOOST_AUTO_TEST_CASE( ENDINC ) {
 
 BOOST_AUTO_TEST_CASE( EQUIL_MISSING_DIMS ) {
     Parser parser;
+    ErrorGuard errors;
     ParseContext parseContext;
     parseContext.update(ParseContext::PARSE_MISSING_DIMS_KEYWORD, InputError::IGNORE);
     const std::string equil = "EQUIL\n"
         "2469   382.4   1705.0  0.0    500    0.0     1     1      20 /";
-    auto deck = parser.parseString(equil, parseContext);
+    auto deck = parser.parseString(equil, parseContext, errors);
     const auto& kw1 = deck.getKeyword("EQUIL" , 0);
     BOOST_CHECK_EQUAL( 1U , kw1.size() );
 
@@ -132,7 +135,7 @@ BOOST_AUTO_TEST_CASE( EQUIL_MISSING_DIMS ) {
 BOOST_AUTO_TEST_CASE( EQUIL ) {
     Parser parser;
     std::string pvtgFile(pathprefix() + "EQUIL/EQUIL1");
-    auto deck =  parser.parseFile(pvtgFile, ParseContext());
+    auto deck =  parser.parseFile(pvtgFile);
     const auto& kw1 = deck.getKeyword("EQUIL" , 0);
     BOOST_CHECK_EQUAL( 3U , kw1.size() );
 
@@ -208,12 +211,12 @@ BOOST_AUTO_TEST_CASE( SORWMIS ) {
 
     Parser parser;
     // missing miscible keyword
-    BOOST_CHECK_THROW (parser.parseString(sorwmisData, ParseContext()), std::invalid_argument );
+    BOOST_CHECK_THROW (parser.parseString(sorwmisData), std::invalid_argument );
 
     //too many tables
-    BOOST_CHECK_THROW( parser.parseString(miscibleTightData + sorwmisData, ParseContext()), std::invalid_argument);
+    BOOST_CHECK_THROW( parser.parseString(miscibleTightData + sorwmisData), std::invalid_argument);
 
-    auto deck1 =  parser.parseString(miscibleData + sorwmisData, ParseContext());
+    auto deck1 =  parser.parseString(miscibleData + sorwmisData);
 
     const auto& sorwmis = deck1.getKeyword("SORWMIS");
     const auto& miscible = deck1.getKeyword("MISCIBLE");
@@ -243,7 +246,7 @@ BOOST_AUTO_TEST_CASE( SORWMIS ) {
 
 BOOST_AUTO_TEST_CASE( SGCWMIS ) {
     Parser parser;
-    auto deck1 =  parser.parseString(miscibleData + sgcwmisData, ParseContext());
+    auto deck1 =  parser.parseString(miscibleData + sgcwmisData);
 
     const auto& sgcwmis = deck1.getKeyword("SGCWMIS");
     const auto& miscible = deck1.getKeyword("MISCIBLE");
@@ -304,17 +307,17 @@ BOOST_AUTO_TEST_CASE( MISC ) {
     Parser parser;
 
     // out of range MISC keyword
-    auto deck1 = parser.parseString(miscOutOfRangeData, ParseContext());
+    auto deck1 = parser.parseString(miscOutOfRangeData);
     const auto& item = deck1.getKeyword("MISC").getRecord(0).getItem(0);
     Opm::MiscTable miscTable1(item);
 
     // too litle range of MISC keyword
-    auto deck2 = parser.parseString(miscTooSmallRangeData, ParseContext());
+    auto deck2 = parser.parseString(miscTooSmallRangeData);
     const auto& item2 = deck2.getKeyword("MISC").getRecord(0).getItem(0);
     Opm::MiscTable miscTable2(item2);
 
     // test table input
-    auto deck3 =  parser.parseString(miscData, ParseContext());
+    auto deck3 =  parser.parseString(miscData);
     const auto& item3 = deck3.getKeyword("MISC").getRecord(0).getItem(0);
     Opm::MiscTable miscTable3(item3);
     BOOST_CHECK_EQUAL(3U, miscTable3.getSolventFractionColumn().size());
@@ -334,7 +337,7 @@ PMISC
 
 BOOST_AUTO_TEST_CASE( PMISC ) {
     Parser parser;
-    auto deck =  parser.parseString(pmiscData, ParseContext());
+    auto deck =  parser.parseString(pmiscData);
     Opm::PmiscTable pmiscTable(deck.getKeyword("PMISC").getRecord(0).getItem(0));
     BOOST_CHECK_EQUAL(3U, pmiscTable.getOilPhasePressureColumn().size());
     BOOST_CHECK_EQUAL(200*1e5, pmiscTable.getOilPhasePressureColumn()[1]);
@@ -355,7 +358,7 @@ MSFN
 
 BOOST_AUTO_TEST_CASE( MSFN ) {
     Parser parser;
-    auto deck =  parser.parseString(msfnData, ParseContext());
+    auto deck =  parser.parseString(msfnData);
 
     Opm::MsfnTable msfnTable1(deck.getKeyword("MSFN").getRecord(0).getItem(0));
     BOOST_CHECK_EQUAL(2U, msfnTable1.getGasPhaseFractionColumn().size());
@@ -382,7 +385,7 @@ BOOST_AUTO_TEST_CASE( TLPMIXPA ) {
     )";
 
     Parser parser;
-    auto deck =  parser.parseString(tlpmixpa, ParseContext());
+    auto deck =  parser.parseString(tlpmixpa);
     Opm::TlpmixpaTable tlpmixpaTable(deck.getKeyword("TLPMIXPA").getRecord(0).getItem(0));
     BOOST_CHECK_EQUAL(3U, tlpmixpaTable.getOilPhasePressureColumn().size());
     BOOST_CHECK_EQUAL(200*1e5, tlpmixpaTable.getOilPhasePressureColumn()[1]);
@@ -390,17 +393,18 @@ BOOST_AUTO_TEST_CASE( TLPMIXPA ) {
 }
 
 BOOST_AUTO_TEST_CASE( MULTREGT_ECLIPSE_STATE ) {
-    ParseContext parseContext;
     Parser parser;
-    auto deck =  parser.parseFile(pathprefix() + "MULTREGT/MULTREGT.DATA", parseContext);
-    EclipseState state(deck , parseContext);
+    auto deck =  parser.parseFile(pathprefix() + "MULTREGT/MULTREGT.DATA");
+    EclipseState state(deck);
     const auto& transMult = state.getTransMult();
 
     // Test NONNC
-    // cell 0 and 1 are neigbours
-    BOOST_CHECK_EQUAL( 0.10 , transMult.getRegionMultiplier( 0 , 1 , FaceDir::DirEnum::XPlus));
+    // cell 0 and 1 are neigbour
+    // The last occurence of multiplier between region 1 and 2 is 0.2.
+    // Note that MULTREGT is not direction dependent
+    BOOST_CHECK_EQUAL( 0.20 , transMult.getRegionMultiplier( 0 , 1 , FaceDir::DirEnum::XPlus));
     // cell 0 and 3 are not neigbours ==> 1
-    BOOST_CHECK_EQUAL( 1.00 , transMult.getRegionMultiplier( 0 , 3 , FaceDir::DirEnum::XPlus));
+    BOOST_CHECK_EQUAL( 0.20 , transMult.getRegionMultiplier( 0 , 3 , FaceDir::DirEnum::XPlus));
 
     // Test NNC
     // cell 4 and 5 are neigbours ==> 1
@@ -411,7 +415,7 @@ BOOST_AUTO_TEST_CASE( MULTREGT_ECLIPSE_STATE ) {
     // Test direction X, returns 1 for directions other than +-X
     BOOST_CHECK_EQUAL( 1.00 , transMult.getRegionMultiplier( 0 , 1 , FaceDir::DirEnum::YPlus));
     BOOST_CHECK_EQUAL( 1.00 , transMult.getRegionMultiplier( 0 , 1 , FaceDir::DirEnum::ZPlus));
-    BOOST_CHECK_EQUAL( 0.10 , transMult.getRegionMultiplier( 0 , 1 , FaceDir::DirEnum::XMinus));
+    BOOST_CHECK_EQUAL( 0.20 , transMult.getRegionMultiplier( 0 , 1 , FaceDir::DirEnum::XMinus));
     BOOST_CHECK_EQUAL( 1.00 , transMult.getRegionMultiplier( 0 , 1 , FaceDir::DirEnum::YMinus));
     BOOST_CHECK_EQUAL( 1.00 , transMult.getRegionMultiplier( 0 , 1 , FaceDir::DirEnum::ZMinus));
     BOOST_CHECK_EQUAL( 0.20 , transMult.getRegionMultiplier( 1 , 0 , FaceDir::DirEnum::XPlus));
@@ -431,9 +435,9 @@ BOOST_AUTO_TEST_CASE( MULTREGT_ECLIPSE_STATE ) {
     BOOST_CHECK_EQUAL( 1.50 , transMult.getRegionMultiplier( 0 , 4 , FaceDir::DirEnum::ZPlus));
     BOOST_CHECK_EQUAL( 1.50 , transMult.getRegionMultiplier( 4 , 0 , FaceDir::DirEnum::XPlus));
 
-    // The first record is overwritten by the second
-    BOOST_CHECK_EQUAL( 2.50 , transMult.getRegionMultiplier( 3 , 7 , FaceDir::DirEnum::XPlus));
-    BOOST_CHECK_EQUAL( 2.50 , transMult.getRegionMultiplier( 3 , 7 , FaceDir::DirEnum::YPlus));
+    // The first record is overwritten by the third since MULTREGT is direction dependent
+    BOOST_CHECK_EQUAL( 0.60 , transMult.getRegionMultiplier( 3 , 7 , FaceDir::DirEnum::XPlus));
+    BOOST_CHECK_EQUAL( 0.60 , transMult.getRegionMultiplier( 3 , 7 , FaceDir::DirEnum::YPlus));
 
     // The 2 4 0.75 Z input is overwritten by 2 4 2.5 XY, ==) that 2 4 Z returns the 4 2 value = 0.6
     BOOST_CHECK_EQUAL( 0.60 , transMult.getRegionMultiplier( 7 , 3 , FaceDir::DirEnum::XPlus));
@@ -441,10 +445,9 @@ BOOST_AUTO_TEST_CASE( MULTREGT_ECLIPSE_STATE ) {
 }
 
 BOOST_AUTO_TEST_CASE( MULTISEGMENT_ABS ) {
-    const Parser parser;
+    Parser parser;
     const std::string deckFile(pathprefix() + "SCHEDULE/SCHEDULE_MULTISEGMENT_WELL");
-    const ParseContext parseContext;
-    const auto deck =  parser.parseFile(deckFile, parseContext);
+    const auto deck =  parser.parseFile(deckFile);
 
     // for WELSEGS keyword
     const auto& kw = deck.getKeyword("WELSEGS");
@@ -563,11 +566,12 @@ BOOST_AUTO_TEST_CASE( MULTISEGMENT_ABS ) {
         BOOST_CHECK_EQUAL(  3237.5, distance_end );
     }
 
-    const EclipseState state(deck, parseContext);
+    const EclipseState state(deck);
     const auto& grid = state.getInputGrid();
     const TableManager table ( deck );
     const Eclipse3DProperties eclipseProperties ( deck , table, grid);
-    const Schedule sched(deck, grid, eclipseProperties, Phases(true, true, true), parseContext );
+    Runspec runspec (deck);
+    const Schedule sched(deck, grid, eclipseProperties, runspec);
     // checking the relation between segments and completions
     // and also the depth of completions
     {
@@ -616,7 +620,7 @@ BOOST_AUTO_TEST_CASE( PLYADS ) {
 BOOST_AUTO_TEST_CASE( PLYADSS ) {
     Parser parser;
     std::string deckFile(pathprefix() + "POLYMER/plyadss.data");
-    auto deck =  parser.parseFile(deckFile, ParseContext());
+    auto deck =  parser.parseFile(deckFile);
     const auto& kw = deck.getKeyword("PLYADSS");
     BOOST_CHECK_EQUAL( kw.size() , 11U );
 }
@@ -624,7 +628,7 @@ BOOST_AUTO_TEST_CASE( PLYADSS ) {
 BOOST_AUTO_TEST_CASE( PLYDHFLF ) {
     Parser parser;
     std::string deckFile(pathprefix() + "POLYMER/plydhflf.data");
-    auto deck =  parser.parseFile(deckFile, ParseContext());
+    auto deck =  parser.parseFile(deckFile);
     const auto& kw = deck.getKeyword("PLYDHFLF");
     const auto& rec = kw.getRecord(0);
     const auto& item = rec.getItem(0);
@@ -637,7 +641,7 @@ BOOST_AUTO_TEST_CASE( PLYDHFLF ) {
 BOOST_AUTO_TEST_CASE( PLYSHLOG ) {
     Parser parser;
     std::string deckFile(pathprefix() + "POLYMER/plyshlog.data");
-    auto deck =  parser.parseFile(deckFile, ParseContext());
+    auto deck =  parser.parseFile(deckFile);
     const auto& kw = deck.getKeyword("PLYSHLOG");
     const auto& rec1 = kw.getRecord(0); // reference conditions
 
@@ -666,7 +670,7 @@ BOOST_AUTO_TEST_CASE( PLYSHLOG ) {
 BOOST_AUTO_TEST_CASE( PLYVISC ) {
     Parser parser;
     std::string deckFile(pathprefix() + "POLYMER/plyvisc.data");
-    auto deck =  parser.parseFile(deckFile, ParseContext());
+    auto deck =  parser.parseFile(deckFile);
     const auto& kw = deck.getKeyword("PLYVISC");
     const auto& rec = kw.getRecord(0);
     const auto& item = rec.getItem(0);
@@ -678,7 +682,7 @@ BOOST_AUTO_TEST_CASE( PLYVISC ) {
 BOOST_AUTO_TEST_CASE( PORO_PERMX ) {
     Parser parser;
     std::string poroFile(pathprefix() + "PORO/PORO1");
-    auto deck =  parser.parseFile(poroFile, ParseContext());
+    auto deck =  parser.parseFile(poroFile);
     const auto& kw1 = deck.getKeyword("PORO" , 0);
     const auto& kw2 = deck.getKeyword("PERMX" , 0);
 
@@ -720,7 +724,7 @@ PRORDER
 BOOST_AUTO_TEST_CASE( RSVD ) {
     Parser parser;
     std::string pvtgFile(pathprefix() + "RSVD/RSVD.txt");
-    auto deck =  parser.parseFile(pvtgFile, ParseContext());
+    auto deck =  parser.parseFile(pvtgFile);
     const auto& kw1 = deck.getKeyword("RSVD" , 0);
     BOOST_CHECK_EQUAL( 6U , kw1.size() );
 
@@ -759,7 +763,7 @@ PVTG
 )";
 
     Parser parser;
-    auto deck =  parser.parseString(pvtgData, ParseContext());
+    auto deck =  parser.parseString(pvtgData);
     const auto& kw1 = deck.getKeyword("PVTG" , 0);
     BOOST_CHECK_EQUAL(5U , kw1.size());
 
@@ -856,7 +860,7 @@ PVTO
 )";
 
     Parser parser;
-    auto deck =  parser.parseString(pvtoData, ParseContext());
+    auto deck =  parser.parseString(pvtoData);
     const auto& kw1 = deck.getKeyword("PVTO" , 0);
     BOOST_CHECK_EQUAL(5U , kw1.size());
 
@@ -934,7 +938,7 @@ SGOF
     1.0 1.0 0.1 9.0 /;
 )";
     Parser parser;
-    auto deck =  parser.parseString(parserData, ParseContext());
+    auto deck =  parser.parseString(parserData);
 
     const auto& kw1 = deck.getKeyword("SGOF");
     BOOST_CHECK_EQUAL(1U , kw1.size());
@@ -972,7 +976,7 @@ SWOF
     1.0  1* 0.1 9.0 /
 )";
     Parser parser;
-    auto deck =  parser.parseString(parserData, ParseContext());
+    auto deck =  parser.parseString(parserData);
 
     const auto& kw1 = deck.getKeyword("SWOF");
     const auto& record0 = kw1.getRecord(0);
@@ -1028,7 +1032,7 @@ SLGOF
 )";
 
     Parser parser;
-    auto deck =  parser.parseString(parserData, ParseContext());
+    auto deck =  parser.parseString(parserData);
 
     const auto& kw1 = deck.getKeyword("SLGOF");
     const auto& record0 = kw1.getRecord(0);
@@ -1050,7 +1054,7 @@ BOOST_AUTO_TEST_CASE( TITLE ) {
     Parser parser;
     std::string fileWithTitleKeyword(pathprefix() + "TITLE/TITLE1.txt");
 
-    auto deck = parser.parseFile(fileWithTitleKeyword, ParseContext());
+    auto deck = parser.parseFile(fileWithTitleKeyword);
 
     BOOST_CHECK_EQUAL(size_t(2), deck.size());
     BOOST_CHECK_EQUAL (true, deck.hasKeyword("TITLE"));
@@ -1069,9 +1073,8 @@ BOOST_AUTO_TEST_CASE( TITLE ) {
 BOOST_AUTO_TEST_CASE( TOPS ) {
     Parser parser;
     std::string deckFile(pathprefix() + "GRID/TOPS.DATA");
-    ParseContext parseContext;
-    auto deck =  parser.parseFile(deckFile, parseContext);
-    EclipseState state(deck, parseContext);
+    auto deck =  parser.parseFile(deckFile);
+    EclipseState state(deck);
     const auto& grid = state.getInputGrid();
 
     BOOST_CHECK_EQUAL( grid.getNX() , 9 );
@@ -1129,7 +1132,7 @@ TUNINGDP
 BOOST_AUTO_TEST_CASE( TVDP ) {
     Parser parser;
     std::string poroFile(pathprefix() + "TVDP/TVDP1");
-    auto deck =  parser.parseFile(poroFile, ParseContext());
+    auto deck =  parser.parseFile(poroFile);
 
     BOOST_CHECK(!deck.hasKeyword("TVDP*"));
     BOOST_CHECK( deck.hasKeyword("TVDPA"));
@@ -1143,7 +1146,7 @@ BOOST_AUTO_TEST_CASE( VFPPROD ) {
     std::string file(pathprefix() + "VFPPROD/VFPPROD1");
     BOOST_CHECK( parser.isRecognizedKeyword("VFPPROD"));
 
-    auto deck =  parser.parseFile(file, ParseContext());
+    auto deck =  parser.parseFile(file);
     const auto& VFPPROD1 = deck.getKeyword("VFPPROD" , 0);
     const auto& BPR = deck.getKeyword("BPR" , 0);
     const auto& VFPPROD2 = deck.getKeyword("VFPPROD" , 1);
@@ -1272,7 +1275,7 @@ BOOST_AUTO_TEST_CASE( VFPPROD ) {
 BOOST_AUTO_TEST_CASE( WCHONHIST ) {
     Parser parser;
     std::string wconhistFile(pathprefix() + "WCONHIST/WCONHIST1");
-    auto deck =  parser.parseFile(wconhistFile, ParseContext());
+    auto deck =  parser.parseFile(wconhistFile);
     const auto& kw1 = deck.getKeyword("WCONHIST" , 0);
     BOOST_CHECK_EQUAL( 3U , kw1.size() );
 
@@ -1335,7 +1338,7 @@ WOPR
     BOOST_CHECK_THROW(parser->parseString(invalidDeckString), std::invalid_argument);
 */
 
-    auto deck = parser.parseString(validDeckString, ParseContext());
+    auto deck = parser.parseString(validDeckString);
     BOOST_CHECK( !deck.hasKeyword("WELL_PROBE"));
     BOOST_CHECK(  deck.hasKeyword("WBHP"));
     BOOST_CHECK(  deck.hasKeyword("WOPR"));
@@ -1345,12 +1348,12 @@ WOPR
 BOOST_AUTO_TEST_CASE( WCONPROD ) {
     Parser parser;
     std::string wconprodFile(pathprefix() + "WellWithWildcards/WCONPROD1");
-    auto deck =  parser.parseFile(wconprodFile, ParseContext());
+    auto deck =  parser.parseFile(wconprodFile);
     EclipseGrid grid(30,30,30);
     TableManager table ( deck );
     Eclipse3DProperties eclipseProperties ( deck , table, grid);
-
-    Schedule sched(deck, grid, eclipseProperties, Phases(true, true, true) , ParseContext());
+    Runspec runspec (deck);
+    Schedule sched(deck, grid, eclipseProperties, runspec );
 
     BOOST_CHECK_EQUAL(5U, sched.numWells());
     BOOST_CHECK(sched.hasWell("INJE1"));
@@ -1380,14 +1383,14 @@ BOOST_AUTO_TEST_CASE( WCONPROD ) {
 
 
 BOOST_AUTO_TEST_CASE( WCONINJE ) {
-    ParseContext parseContext;
     Parser parser;
     std::string wconprodFile(pathprefix() + "WellWithWildcards/WCONINJE1");
-    auto deck = parser.parseFile(wconprodFile, parseContext);
+    auto deck = parser.parseFile(wconprodFile);
     EclipseGrid grid(30,30,30);
     TableManager table ( deck );
     Eclipse3DProperties eclipseProperties( deck , table, grid );
-    Schedule sched( deck, grid, eclipseProperties, Phases(true, true, true) , parseContext);
+    Runspec runspec (deck);
+    Schedule sched( deck, grid, eclipseProperties, runspec);
 
     BOOST_CHECK_EQUAL(5U, sched.numWells());
     BOOST_CHECK(sched.hasWell("PROD1"));

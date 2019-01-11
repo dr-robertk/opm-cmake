@@ -21,8 +21,6 @@
 #define OPM_AGGREGATE_MSW_DATA_HPP
 
 #include <opm/output/data/Wells.hpp>
-#include <opm/output/eclipse/SummaryState.hpp>
-
 #include <opm/output/eclipse/CharArrayNullTerm.hpp>
 #include <opm/output/eclipse/WindowedArray.hpp>
 
@@ -47,17 +45,30 @@ namespace Opm { namespace RestartIO { namespace Helpers {
       int branch;
     };
 
+    struct SegmentSetSourceSinkTerms {
+      std::vector<double> qosc;
+      std::vector<double> qwsc;
+      std::vector<double> qgsc;
+    };
+
+    struct SegmentSetFlowRates {
+      std::vector<double> sofr;
+      std::vector<double> swfr;
+      std::vector<double> sgfr;
+    };    
+    
     class AggregateMSWData
     {
     public:
         explicit AggregateMSWData(const std::vector<int>& inteHead);
-
+	
         void captureDeclaredMSWData(const Opm::Schedule& sched,
                                      const std::size_t    rptStep,
 				     const Opm::UnitSystem& units,
 				     const std::vector<int>& inteHead,
 				     const Opm::EclipseGrid&  grid,
-				     const ::Opm::SummaryState& smry
+				     const Opm::SummaryState& smry,
+				     const Opm::data::WellRates&  wr
 				   );
 
         /// Retrieve Integer Multisegment well data Array.

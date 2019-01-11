@@ -156,8 +156,8 @@ BOOST_AUTO_TEST_CASE(GroupAddWell) {
 
     auto timeMap = createXDaysTimeMap( 10 );
     Opm::Group group("G1" , 1, timeMap , 0);
-    auto well1 = std::make_shared< Well >("WELL1", 1, 0, 0, 0.0, Opm::Phase::OIL, timeMap, 0);
-    auto well2 = std::make_shared< Well >("WELL2", 2, 0, 0, 0.0, Opm::Phase::OIL, timeMap, 0);
+    auto well1 = std::make_shared< Well >("WELL1", 1, 0, 0, 0.0, 0.0, Opm::Phase::OIL, timeMap, 0);
+    auto well2 = std::make_shared< Well >("WELL2", 2, 0, 0, 0.0, 0.0, Opm::Phase::OIL, timeMap, 0);
 
     BOOST_CHECK_EQUAL(0U , group.numWells(2));
     group.addWell( 3 , well1.get() );
@@ -193,8 +193,8 @@ BOOST_AUTO_TEST_CASE(GroupAddAndDelWell) {
 
     auto timeMap = createXDaysTimeMap( 10 );
     Opm::Group group("G1" , 1, timeMap , 0);
-    auto well1 = std::make_shared< Well >("WELL1", 1, 0, 0, 0.0, Opm::Phase::OIL, timeMap, 0);
-    auto well2 = std::make_shared< Well >("WELL2", 2, 0, 0, 0.0, Opm::Phase::OIL, timeMap, 0);
+    auto well1 = std::make_shared< Well >("WELL1", 1, 0, 0, 0.0, 0.0, Opm::Phase::OIL, timeMap, 0);
+    auto well2 = std::make_shared< Well >("WELL2", 2, 0, 0, 0.0, 0.0, Opm::Phase::OIL, timeMap, 0);
 
     BOOST_CHECK_EQUAL(0U , group.numWells(2));
     group.addWell( 3 , well1.get() );
@@ -226,8 +226,8 @@ BOOST_AUTO_TEST_CASE(GroupAddAndDelWell) {
 BOOST_AUTO_TEST_CASE(getWells) {
     auto timeMap = createXDaysTimeMap( 10 );
     Opm::Group group("G1" , 1, timeMap , 0);
-    auto well1 = std::make_shared< Well >("WELL1", 1, 0, 0, 0.0, Opm::Phase::OIL, timeMap, 0);
-    auto well2 = std::make_shared< Well >("WELL2", 2, 0, 0, 0.0, Opm::Phase::OIL, timeMap, 0);
+    auto well1 = std::make_shared< Well >("WELL1", 1, 0, 0, 0.0, 0.0, Opm::Phase::OIL, timeMap, 0);
+    auto well2 = std::make_shared< Well >("WELL2", 2, 0, 0, 0.0, 0.0, Opm::Phase::OIL, timeMap, 0);
 
     group.addWell( 2 , well1.get() );
     group.addWell( 3 , well1.get() );
@@ -278,12 +278,12 @@ BOOST_AUTO_TEST_CASE(createDeckWithGEFAC) {
             " 'PRODUC' 0.85   / \n"
             "/\n";
 
-    Opm::ParseContext parseContext;
-    auto deck = parser.parseString(input, parseContext);
+    auto deck = parser.parseString(input);
     EclipseGrid grid(10,10,10);
     TableManager table ( deck );
     Eclipse3DProperties eclipseProperties ( deck , table, grid);
-    Opm::Schedule schedule(deck,  grid, eclipseProperties, Opm::Phases(true, true, true) , parseContext);
+    Runspec runspec (deck );
+    Opm::Schedule schedule(deck,  grid, eclipseProperties, runspec);
 
     const auto& group1 = schedule.getGroup("PRODUC");
     BOOST_CHECK_EQUAL(group1.getGroupEfficiencyFactor(0), 0.85);
@@ -327,12 +327,12 @@ BOOST_AUTO_TEST_CASE(createDeckWithWGRUPCONandWCONPROD) {
 
 
 
-    Opm::ParseContext parseContext;
-    auto deck = parser.parseString(input, parseContext);
+    auto deck = parser.parseString(input);
     EclipseGrid grid(10,10,10);
     TableManager table ( deck );
     Eclipse3DProperties eclipseProperties ( deck , table, grid);
-    Opm::Schedule schedule(deck,  grid, eclipseProperties, Opm::Phases(true, true, true) , parseContext);
+    Runspec runspec (deck );
+    Opm::Schedule schedule(deck,  grid, eclipseProperties, runspec);
     const auto* currentWell = schedule.getWell("B-37T2");
     const Opm::WellProductionProperties& wellProductionProperties = currentWell->getProductionProperties(0);
     BOOST_CHECK_EQUAL(wellProductionProperties.controlMode, Opm::WellProducer::ControlModeEnum::GRUP);
@@ -418,12 +418,12 @@ BOOST_AUTO_TEST_CASE(createDeckWithGRUPNET) {
         " 'MANI-E2'  1*    9  4* / \n"
         "/\n";
 
-        Opm::ParseContext parseContext;
-        auto deck = parser.parseString(input, parseContext);
+        auto deck = parser.parseString(input);
         EclipseGrid grid(10,10,10);
         TableManager table ( deck );
         Eclipse3DProperties eclipseProperties ( deck , table, grid);
-        Opm::Schedule schedule(deck,  grid, eclipseProperties, Opm::Phases(true, true, true) , parseContext);
+        Runspec runspec (deck );
+        Opm::Schedule schedule(deck,  grid, eclipseProperties, runspec);
 
         const auto& group1 = schedule.getGroup("PROD");
         const auto& group2 = schedule.getGroup("MANI-E2");

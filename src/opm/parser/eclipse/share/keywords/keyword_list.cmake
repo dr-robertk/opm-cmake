@@ -59,8 +59,10 @@ set( keywords
      000_Eclipse100/D/DISGAS
      000_Eclipse100/D/DR
      000_Eclipse100/D/DRSDT
+     000_Eclipse100/D/DRSDTR
      000_Eclipse100/D/DRV
      000_Eclipse100/D/DRVDT
+     000_Eclipse100/D/DRVDTR
      000_Eclipse100/D/DTHETA
      000_Eclipse100/D/DTHETAV
      000_Eclipse100/D/DUMPFLUX
@@ -245,6 +247,7 @@ set( keywords
      000_Eclipse100/R/REFINE
      000_Eclipse100/R/REGDIMS
      000_Eclipse100/R/REGION_PROBE
+     000_Eclipse100/R/REGION2REGION_PROBE
      000_Eclipse100/R/REGIONS
      000_Eclipse100/R/RESTART
      000_Eclipse100/R/RKTRMDIR
@@ -265,7 +268,7 @@ set( keywords
      000_Eclipse100/R/RPTSMRY
      000_Eclipse100/R/RS
      000_Eclipse100/R/RSCONST
-     000_Eclipse100/R/RSCONSTT     
+     000_Eclipse100/R/RSCONSTT
      000_Eclipse100/R/RSVD
      000_Eclipse100/R/RTEMP
      000_Eclipse100/R/RTEMPA
@@ -280,6 +283,7 @@ set( keywords
      000_Eclipse100/S/SCALECRS
      000_Eclipse100/S/SCHEDULE
      000_Eclipse100/S/SDENSITY
+     000_Eclipse100/S/SEGMENT_PROBE
      000_Eclipse100/S/SEPARATE
      000_Eclipse100/S/SGAS
      000_Eclipse100/S/SGCR
@@ -311,8 +315,10 @@ set( keywords
      000_Eclipse100/S/SSFN
      000_Eclipse100/S/SSOL
      000_Eclipse100/S/START
+     000_Eclipse100/S/STONE
      000_Eclipse100/S/STONE1
      000_Eclipse100/S/STONE1EX
+     000_Eclipse100/S/STONE2
      000_Eclipse100/S/SUMMARY
      000_Eclipse100/S/SUMTHIN
      000_Eclipse100/S/SWAT
@@ -323,8 +329,10 @@ set( keywords
      000_Eclipse100/S/SWOF
      000_Eclipse100/S/SWU
      000_Eclipse100/T/TABDIMS
+     000_Eclipse100/T/TBLK
      000_Eclipse100/T/TEMP
      000_Eclipse100/T/THCONR
+     000_Eclipse100/T/THERMAL
      000_Eclipse100/T/THPRES
      000_Eclipse100/T/TITLE
      000_Eclipse100/T/TLMIXPAR
@@ -449,6 +457,11 @@ set( keywords
      900_OPM/P/PINTDIMS
      900_OPM/P/PLYVMH
      900_OPM/P/POLYMW
+     900_OPM/P/PLYMWINJ
      900_OPM/R/RHO
+     900_OPM/S/SKPRPOLY
+     900_OPM/S/SKPRWAT
      900_OPM/S/SPOLYMW
-     900_OPM/T/TLPMIXPA)
+     900_OPM/T/TLPMIXPA
+     900_OPM/W/WPMITAB
+     900_OPM/W/WSKPTAB)

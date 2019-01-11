@@ -34,7 +34,7 @@
 namespace Opm {
 
     Well::Well(const std::string& name_, const size_t& seqIndex_, int headI,
-               int headJ, double refDepth , Phase preferredPhase,
+               int headJ, double refDepth , double drainageRadius, Phase preferredPhase,
                const TimeMap& timeMap, size_t creationTimeStep,
                WellCompletion::CompletionOrderEnum completionOrdering,
                bool allowCrossFlow, bool automaticShutIn)
@@ -54,12 +54,14 @@ namespace Opm {
           m_polymerProperties( timeMap, WellPolymerProperties() ),
           m_econproductionlimits( timeMap, WellEconProductionLimits() ),
           m_solventFraction( timeMap, 0.0 ),
+          m_tracerProperties( timeMap, WellTracerProperties() ),
           m_groupName( timeMap, "" ),
           m_rft( timeMap, false ),
           m_plt( timeMap, false ),
           m_headI( timeMap, headI ),
           m_headJ( timeMap, headJ ),
           m_refDepth( timeMap, refDepth ),
+          m_drainageRadius (timeMap, drainageRadius),
           m_preferredPhase(preferredPhase),
           m_comporder(completionOrdering),
           m_allowCrossFlow(allowCrossFlow),
@@ -75,7 +77,7 @@ namespace Opm {
         return m_name;
     }
 
-        const size_t& Well::seqIndex() const {
+    const size_t& Well::seqIndex() const {
         return m_seqIndex;
     }
 
@@ -207,6 +209,13 @@ namespace Opm {
         return m_solventFraction.update(timeStep, fraction);
     }
 
+    bool Well::setTracerProperties(size_t timeStep , const WellTracerProperties& newProperties) {
+        if (isProducer(timeStep))
+            throw std::invalid_argument("WTRACER keyword can only be applied to injectors");
+
+        return m_tracerProperties.update(timeStep, newProperties);
+    }
+
     bool Well::setEconProductionLimits(const size_t timeStep, const WellEconProductionLimits& productionlimits) {
         // not sure if this keyword turning a well to be producer.
         // not sure what will happen if we use this keyword to a injector.
@@ -219,6 +228,10 @@ namespace Opm {
 
     const double& Well::getSolventFraction(size_t timeStep) const {
         return m_solventFraction.at(timeStep);
+    }
+
+    const WellTracerProperties& Well::getTracerProperties(size_t timeStep) const {
+        return m_tracerProperties.at(timeStep);
     }
 
 
@@ -347,6 +360,13 @@ namespace Opm {
         this->m_refDepth.update( timestep, depth );
     }
 
+    void Well::setDrainageRadius( size_t timestep, double radius ) {
+        this->m_drainageRadius.update( timestep, radius );
+    }
+    double Well::getDrainageRadius(size_t timestep) const {
+        return m_drainageRadius.get( timestep );
+    }
+
     Phase Well::getPreferredPhase() const {
         return m_preferredPhase;
     }
@@ -381,7 +401,7 @@ namespace Opm {
         return *m_completions.back();
     }
 
-    const std::size_t Well::getTotNoConn() const {
+    std::size_t Well::getTotNoConn() const {
         return this->m_totNoConn;
     }
 

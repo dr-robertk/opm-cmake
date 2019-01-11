@@ -29,11 +29,13 @@
 namespace Opm {
 
     class Deck;
+    class ParseContext;
+    class ErrorGuard;
 
     class EclipseConfig
     {
     public:
-        EclipseConfig(const Deck& deck);
+        EclipseConfig(const Deck& deck, const ParseContext& parseContext, ErrorGuard& errors);
 
         const InitConfig& init() const;
         const IOConfig& io() const;

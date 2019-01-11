@@ -23,15 +23,17 @@
 #include <memory>
 #include <vector>
 
+#include <opm/parser/eclipse/Parser/ErrorGuard.hpp>
+#include <opm/parser/eclipse/Parser/ParseContext.hpp>
 #include <opm/parser/eclipse/EclipseState/Eclipse3DProperties.hpp>
 #include <opm/parser/eclipse/EclipseState/EclipseConfig.hpp>
+#include <opm/parser/eclipse/EclipseState/Edit/EDITNNC.hpp>
 #include <opm/parser/eclipse/EclipseState/Grid/EclipseGrid.hpp>
 #include <opm/parser/eclipse/EclipseState/Grid/FaultCollection.hpp>
 #include <opm/parser/eclipse/EclipseState/Grid/NNC.hpp>
 #include <opm/parser/eclipse/EclipseState/Grid/TransMult.hpp>
 #include <opm/parser/eclipse/EclipseState/Runspec.hpp>
 #include <opm/parser/eclipse/EclipseState/Tables/TableManager.hpp>
-#include <opm/parser/eclipse/Parser/ParseContext.hpp>
 #include <opm/parser/eclipse/EclipseState/SimulationConfig/SimulationConfig.hpp>
 
 namespace Opm {
@@ -64,9 +66,11 @@ namespace Opm {
             AllProperties = IntProperties | DoubleProperties
         };
 
-        EclipseState(const Deck& deck , ParseContext parseContext = ParseContext());
+        template<typename T>
+        EclipseState(const Deck& deck , const ParseContext& parseContext, T&& errors);
+        EclipseState(const Deck& deck , const ParseContext& parseContext, ErrorGuard& errors);
+        EclipseState(const Deck& deck);
 
-        const ParseContext& getParseContext() const;
         const IOConfig& getIOConfig() const;
         IOConfig& getIOConfig();
 
@@ -84,6 +88,11 @@ namespace Opm {
         /// the non-standard adjacencies as specified in input deck
         const NNC& getInputNNC() const;
         bool hasInputNNC() const;
+
+        /// editing non-neighboring connections
+        /// the non-standard adjacencies as specified in input deck
+        const EDITNNC& getInputEDITNNC() const;
+        bool hasInputEDITNNC() const;
 
         const Eclipse3DProperties& get3DProperties() const;
         const TableManager& getTableManager() const;
@@ -112,12 +121,12 @@ namespace Opm {
         void complainAboutAmbiguousKeyword(const Deck& deck,
                                            const std::string& keywordName);
 
-        ParseContext m_parseContext;
         const TableManager m_tables;
         Runspec m_runspec;
         EclipseConfig m_eclipseConfig;
         UnitSystem m_deckUnitSystem;
         NNC m_inputNnc;
+        EDITNNC m_inputEditNnc;
         EclipseGrid m_inputGrid;
         Eclipse3DProperties m_eclipseProperties;
         const SimulationConfig m_simulationConfig;

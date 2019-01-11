@@ -28,6 +28,8 @@
 #include <opm/parser/eclipse/Deck/DeckKeyword.hpp>
 #include <opm/parser/eclipse/Deck/DeckRecord.hpp>
 #include <opm/parser/eclipse/Deck/Section.hpp>
+#include <opm/parser/eclipse/Parser/ParseContext.hpp>
+#include <opm/parser/eclipse/Parser/ErrorGuard.hpp>
 #include <opm/parser/eclipse/EclipseState/IOConfig/RestartConfig.hpp>
 #include <opm/parser/eclipse/EclipseState/Schedule/DynamicState.hpp>
 #include <opm/parser/eclipse/EclipseState/Schedule/Schedule.hpp>
@@ -294,36 +296,77 @@ RPTSCHED_integer( const std::vector< int >& ints ) {
 
 template< typename F, typename G >
 inline std::map< std::string, int > RPT( const DeckKeyword& keyword,
+                                         const ParseContext& parseContext,
+                                         ErrorGuard& errors,
                                          F is_mnemonic,
                                          G integer_mnemonic ) {
 
-    const auto& items = keyword.getStringData();
-    const auto ints = std::any_of( items.begin(), items.end(), is_int );
-    const auto strs = !std::all_of( items.begin(), items.end(), is_int );
+    std::vector<std::string> items;
+    const auto& deck_items = keyword.getStringData();
+    const auto ints = std::any_of( deck_items.begin(), deck_items.end(), is_int );
+    const auto strs = !std::all_of( deck_items.begin(), deck_items.end(), is_int );
 
-    /* if any of the values are pure integers we assume this is meant to be
-     * the slash-terminated list of integers way of configuring. If
-     * integers and non-integers are mixed, this is an error.
+    /* if any of the values are pure integers we assume this is meant to be the
+     * slash-terminated list of integers way of configuring. If integers and
+     * non-integers are mixed, this is an error; however if the error mode
+     * RPT_MIXED_STYLE is permissive we try some desperate heuristics to
+     * interpret this as list of mnemonics. See the the documentation of the
+     * RPT_MIXED_STYLE error handler for more details.
      */
-    if( ints && strs ) throw std::runtime_error(
-            "RPTRST does not support mixed mnemonics and integer list."
-            );
-
     auto stoi = []( const std::string& str ) { return std::stoi( str ); };
-    if( ints )
-        return integer_mnemonic( fun::map( stoi, items ) );
+    if( !strs )
+        return integer_mnemonic( fun::map( stoi, deck_items ) );
+
+
+    if (ints && strs) {
+        std::string msg = "Mixed style input is not allowed for keyword: " + keyword.name() + " at " + keyword.getFileName() + "(" + std::to_string( keyword.getLineNumber() ) + ")";
+        parseContext.handleError(ParseContext::RPT_MIXED_STYLE, msg, errors);
+
+        std::vector<std::string> stack;
+        for (size_t index=0; index < deck_items.size(); index++) {
+            if (is_int(deck_items[index])) {
+
+                if (stack.size() < 2) {
+                    std::string errmsg = "Can not interpret " + keyword.name() + " at " + keyword.getFileName() + "(" + std::to_string( keyword.getLineNumber() ) + ")";
+                    throw std::invalid_argument(errmsg);
+                }
+
+                if (stack.back() == "=") {
+                    stack.pop_back();
+                    std::string mnemonic = stack.back();
+                    stack.pop_back();
+
+                    items.insert(items.begin(), stack.begin(), stack.end());
+                    stack.clear();
+                    items.push_back( mnemonic + "=" + deck_items[index]);
+                } else {
+                    std::string errmsg = "Can not interpret " + keyword.name() + " at " + keyword.getFileName() + "(" + std::to_string( keyword.getLineNumber() ) + ")";
+                    throw std::invalid_argument(errmsg);
+                }
+
+            } else
+                stack.push_back(deck_items[index]);
+        }
+        items.insert(items.begin(), stack.begin(), stack.end());
+    } else
+        items = deck_items;
 
     std::map< std::string, int > mnemonics;
-
     for( const auto& mnemonic : items ) {
-        const auto pos = mnemonic.find( '=' );
+        const auto sep_pos = mnemonic.find_first_of( "= " );
 
-        std::string base = mnemonic.substr( 0, pos );
-        if( !is_mnemonic( base ) ) continue;
+        std::string base = mnemonic.substr( 0, sep_pos );
+        if( !is_mnemonic( base ) ) {
+            parseContext.handleError(ParseContext::RPT_UNKNOWN_MNEMONIC, "The mnemonic: " + base + " is not recognized.", errors);
+            continue;
+        }
 
-        const int val = pos != std::string::npos
-                      ? std::stoi( mnemonic.substr( pos + 1 ) )
-                      : 1;
+        int val = 1;
+        if (sep_pos != std::string::npos) {
+            const auto value_pos = mnemonic.find_first_not_of("= ", sep_pos);
+            if (value_pos != std::string::npos)
+                val = std::stoi(mnemonic.substr(value_pos));
+        }
 
         mnemonics.emplace( base, val );
     }
@@ -345,8 +388,8 @@ inline void expand_RPTRST_mnemonics(std::map< std::string, int >& mnemonics) {
 
 
 inline std::pair< std::map< std::string, int >, RestartSchedule >
-RPTRST( const DeckKeyword& keyword, RestartSchedule prev, size_t step ) {
-    auto mnemonics = RPT( keyword, is_RPTRST_mnemonic, RPTRST_integer );
+RPTRST( const DeckKeyword& keyword, const ParseContext& parseContext, ErrorGuard& errors, RestartSchedule prev, size_t step ) {
+    auto mnemonics = RPT( keyword, parseContext, errors, is_RPTRST_mnemonic, RPTRST_integer );
 
     const bool has_freq  = mnemonics.find( "FREQ" )  != mnemonics.end();
     const bool has_basic = mnemonics.find( "BASIC" ) != mnemonics.end();
@@ -362,8 +405,8 @@ RPTRST( const DeckKeyword& keyword, RestartSchedule prev, size_t step ) {
 }
 
 inline std::pair< std::map< std::string, int >, RestartSchedule >
-RPTSCHED( const DeckKeyword& keyword ) {
-    auto mnemonics = RPT( keyword, is_RPTSCHED_mnemonic, RPTSCHED_integer );
+RPTSCHED( const DeckKeyword& keyword, const ParseContext& parseContext, ErrorGuard& errors ) {
+    auto mnemonics = RPT( keyword, parseContext, errors, is_RPTSCHED_mnemonic, RPTSCHED_integer );
 
     if( mnemonics.count( "NOTHING" ) )
         return { std::move( mnemonics ), { RestartSchedule(0) } };
@@ -376,7 +419,7 @@ RPTSCHED( const DeckKeyword& keyword ) {
 
 
 
-void RestartConfig::handleScheduleSection(const SCHEDULESection& schedule) {
+void RestartConfig::handleScheduleSection(const SCHEDULESection& schedule, const ParseContext& parseContext, ErrorGuard& errors) {
     size_t current_step = 1;
     RestartSchedule unset;
 
@@ -410,9 +453,8 @@ void RestartConfig::handleScheduleSection(const SCHEDULESection& schedule) {
         const bool is_RPTRST = name == "RPTRST";
         const auto& prev_sched = this->restart_schedule.back();
 
-        auto config = is_RPTRST
-                      ? RPTRST( keyword, prev_sched, current_step )
-                      : RPTSCHED( keyword );
+        auto config = is_RPTRST ? RPTRST( keyword, parseContext, errors, prev_sched, current_step )
+            : RPTSCHED( keyword , parseContext, errors);
 
         /* add the missing entries from the previous step */
         {
@@ -470,15 +512,28 @@ void RestartConfig::handleScheduleSection(const SCHEDULESection& schedule) {
 
 
 
-    RestartConfig::RestartConfig( const Deck& deck ) :
+    RestartConfig::RestartConfig( const Deck& deck, const ParseContext& parseContext, ErrorGuard& errors ) :
         RestartConfig( SCHEDULESection( deck ),
                        SOLUTIONSection( deck ),
+                       parseContext,
+                       errors,
                        TimeMap{ deck } )
+    {}
+
+    template<typename T>
+    RestartConfig::RestartConfig( const Deck& deck, const ParseContext& parseContext, T&& errors ) :
+        RestartConfig(deck, parseContext, errors)
+    {}
+
+    RestartConfig::RestartConfig( const Deck& deck) :
+        RestartConfig(deck, ParseContext(), ErrorGuard())
     {}
 
 
     RestartConfig::RestartConfig( const SCHEDULESection& schedule,
                                   const SOLUTIONSection& solution,
+                                  const ParseContext& parseContext,
+                                  ErrorGuard& errors,
                                   TimeMap timemap) :
         m_timemap( std::move( timemap ) ),
         m_first_restart_step( -1 ),
@@ -486,8 +541,8 @@ void RestartConfig::handleScheduleSection(const SCHEDULESection& schedule) {
         restart_keywords( m_timemap, {} ),
         save_keywords( m_timemap.size(), false )
     {
-        handleSolutionSection( solution );
-        handleScheduleSection( schedule );
+        handleSolutionSection( solution, parseContext, errors );
+        handleScheduleSection( schedule, parseContext, errors );
 
         initFirstOutput( );
     }
@@ -498,13 +553,15 @@ void RestartConfig::handleScheduleSection(const SCHEDULESection& schedule) {
     }
 
 
-    bool RestartConfig::getWriteRestartFile(size_t timestep) const {
+    bool RestartConfig::getWriteRestartFile(size_t timestep, bool log) const {
         if (0 == timestep)
             return m_write_initial_RST_file;
 
         if (save_keywords[timestep]) {
-            std::string logstring = "Fast restart using SAVE is not supported. Standard restart file is written instead";
-            Opm::OpmLog::warning("Unhandled output keyword", logstring);
+            if ( log ) {
+                std::string logstring = "Fast restart using SAVE is not supported. Standard restart file is written instead";
+                Opm::OpmLog::warning("Unhandled output keyword", logstring);
+            }
             return true;
         }
 
@@ -556,11 +613,11 @@ void RestartConfig::handleScheduleSection(const SCHEDULESection& schedule) {
     }
 
 
-    void RestartConfig::handleSolutionSection(const SOLUTIONSection& solutionSection) {
+    void RestartConfig::handleSolutionSection(const SOLUTIONSection& solutionSection, const ParseContext& parseContext, ErrorGuard& errors) {
         if (solutionSection.hasKeyword("RPTRST")) {
             const auto& rptrstkeyword        = solutionSection.getKeyword("RPTRST");
 
-            const auto rptrst = RPTRST( rptrstkeyword, {}, 0 );
+            const auto rptrst = RPTRST( rptrstkeyword, parseContext, errors, {}, 0 );
             this->restart_keywords.updateInitial( rptrst.first );
             this->restart_schedule.updateInitial( rptrst.second );
             setWriteInitialRestartFile(true); // Guessing on eclipse rules for write of initial RESTART file (at time 0):

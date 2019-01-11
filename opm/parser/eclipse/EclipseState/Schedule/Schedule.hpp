@@ -40,31 +40,60 @@
 #include <opm/parser/eclipse/EclipseState/Schedule/VFPInjTable.hpp>
 #include <opm/parser/eclipse/EclipseState/Schedule/VFPProdTable.hpp>
 #include <opm/parser/eclipse/EclipseState/Schedule/WellTestConfig.hpp>
+#include <opm/parser/eclipse/EclipseState/Schedule/Actions.hpp>
 
 namespace Opm
 {
 
+    class Actions;
     class Deck;
     class DeckKeyword;
     class DeckRecord;
     class EclipseGrid;
     class Eclipse3DProperties;
+    class EclipseState;
+    class Runspec;
     class SCHEDULESection;
+    class SummaryState;
     class TimeMap;
     class UnitSystem;
-    class EclipseState;
+    class ErrorGuard;
 
     class Schedule {
     public:
         Schedule(const Deck& deck,
                  const EclipseGrid& grid,
                  const Eclipse3DProperties& eclipseProperties,
-                 const Phases &phases,
-                 const ParseContext& parseContext = ParseContext());
+                 const Runspec &runspec,
+                 const ParseContext& parseContext,
+                 ErrorGuard& errors);
+
+        template<typename T>
+        Schedule(const Deck& deck,
+                 const EclipseGrid& grid,
+                 const Eclipse3DProperties& eclipseProperties,
+                 const Runspec &runspec,
+                 const ParseContext& parseContext,
+                 T&& errors);
+
+        Schedule(const Deck& deck,
+                 const EclipseGrid& grid,
+                 const Eclipse3DProperties& eclipseProperties,
+                 const Runspec &runspec);
 
         Schedule(const Deck& deck,
                  const EclipseState& es,
-                 const ParseContext& parseContext = ParseContext());
+                 const ParseContext& parseContext,
+                 ErrorGuard& errors);
+
+        template <typename T>
+        Schedule(const Deck& deck,
+                 const EclipseState& es,
+                 const ParseContext& parseContext,
+                 T&& errors);
+
+        Schedule(const Deck& deck,
+                 const EclipseState& es);
 
         /*
          * If the input deck does not specify a start time, Eclipse's 1. Jan
@@ -95,26 +124,28 @@ namespace Opm
 
           is an inefficient way to get all the wells defined at time
           't'.
-        */ 
-	//std::vector< const Group& > getChildGroups(const std::string& group_name, size_t timeStep) const;
+        */
+        //std::vector< const Group& > getChildGroups(const std::string& group_name, size_t timeStep) const;
         std::vector< const Group* > getChildGroups(const std::string& group_name, size_t timeStep) const;
         std::vector< const Well* > getWells(const std::string& group, size_t timeStep) const;
-	std::vector< const Well* > getChildWells(const std::string& group_name, size_t timeStep) const;
+        std::vector< const Well* > getChildWells(const std::string& group_name, size_t timeStep) const;
         std::vector< const Well* > getWellsMatching( const std::string& ) const;
         const OilVaporizationProperties& getOilVaporizationProperties(size_t timestep) const;
 
         const WellTestConfig& wtestConfig(size_t timestep) const;
+        const Actions& actionConfig() const;
+        void evalAction(const SummaryState& summary_state, size_t timeStep);
 
         const GroupTree& getGroupTree(size_t t) const;
         size_t numGroups() const;
-	size_t numGroups(size_t timeStep) const;
+        size_t numGroups(size_t timeStep) const;
         bool hasGroup(const std::string& groupName) const;
         const Group& getGroup(const std::string& groupName) const;
         std::vector< const Group* > getGroups() const;
-	std::vector< const Group* > getGroups(size_t timeStep) const;
+        std::vector< const Group* > getGroups(size_t timeStep) const;
         const Tuning& getTuning() const;
         const MessageLimits& getMessageLimits() const;
-        void invalidNamePattern (const std::string& namePattern, const ParseContext& parseContext, const DeckKeyword& keyword) const;
+        void invalidNamePattern (const std::string& namePattern, const ParseContext& parseContext, ErrorGuard& errors, const DeckKeyword& keyword) const;
 
         const Events& getEvents() const;
         const Deck& getModifierDeck(size_t timeStep) const;
@@ -139,57 +170,63 @@ namespace Opm
         DynamicVector< Deck > m_modifierDeck;
         Tuning m_tuning;
         MessageLimits m_messageLimits;
-        Phases m_phases;
+        Runspec m_runspec;
         std::map<int, DynamicState<std::shared_ptr<VFPProdTable>>> vfpprod_tables;
         std::map<int, DynamicState<std::shared_ptr<VFPInjTable>>> vfpinj_tables;
         DynamicState<std::shared_ptr<WellTestConfig>> wtest_config;
 
         WellProducer::ControlModeEnum m_controlModeWHISTCTL;
+        Actions actions;
 
         std::vector< Well* > getWells(const std::string& wellNamePattern);
         std::vector< Group* > getGroups(const std::string& groupNamePattern);
 
         void updateWellStatus( Well& well, size_t reportStep , WellCommon::StatusEnum status);
         void addWellToGroup( Group& newGroup , Well& well , size_t timeStep);
-        void iterateScheduleSection(const ParseContext& parseContext ,  const SCHEDULESection& , const EclipseGrid& grid,
+        void iterateScheduleSection(const ParseContext& parseContext ,  ErrorGuard& errors, const SCHEDULESection& , const EclipseGrid& grid,
                                     const Eclipse3DProperties& eclipseProperties);
         bool handleGroupFromWELSPECS(const std::string& groupName, GroupTree& newTree) const;
         void addGroup(const std::string& groupName , size_t timeStep);
         void addWell(const std::string& wellName, const DeckRecord& record, size_t timeStep, WellCompletion::CompletionOrderEnum wellCompletionOrder);
-        void handleCOMPORD(const ParseContext& parseContext, const DeckKeyword& compordKeyword, size_t currentStep);
+        void handleCOMPORD(const ParseContext& parseContext, ErrorGuard& errors, const DeckKeyword& compordKeyword, size_t currentStep);
         void handleWELSPECS( const SCHEDULESection&, size_t, size_t  );
-        void handleWCONProducer( const DeckKeyword& keyword, size_t currentStep, bool isPredictionMode,  const ParseContext& parseContext);
-        void handleWCONHIST( const DeckKeyword& keyword, size_t currentStep, const ParseContext& parseContext);
-        void handleWCONPROD( const DeckKeyword& keyword, size_t currentStep, const ParseContext& parseContext);
+        void handleWCONProducer( const DeckKeyword& keyword, size_t currentStep, bool isPredictionMode,  const ParseContext& parseContext, ErrorGuard& errors);
+        void handleWCONHIST( const DeckKeyword& keyword, size_t currentStep, const ParseContext& parseContext, ErrorGuard& errors);
+        void handleWCONPROD( const DeckKeyword& keyword, size_t currentStep, const ParseContext& parseContext, ErrorGuard& errors);
         void handleWGRUPCON( const DeckKeyword& keyword, size_t currentStep);
-        void handleCOMPDAT( const DeckKeyword& keyword,  size_t currentStep, const EclipseGrid& grid, const Eclipse3DProperties& eclipseProperties, const ParseContext& parseContext);
+        void handleCOMPDAT( const DeckKeyword& keyword,  size_t currentStep, const EclipseGrid& grid, const Eclipse3DProperties& eclipseProperties, const ParseContext& parseContext, ErrorGuard& errors);
         void handleCOMPLUMP( const DeckKeyword& keyword,  size_t currentStep );
         void handleWELSEGS( const DeckKeyword& keyword, size_t currentStep);
         void handleCOMPSEGS( const DeckKeyword& keyword, size_t currentStep, const EclipseGrid& grid);
-        void handleWCONINJE( const SCHEDULESection&,  const DeckKeyword& keyword, size_t currentStep, const ParseContext& parseContext);
-        void handleWPOLYMER( const DeckKeyword& keyword, size_t currentStep, const ParseContext& parseContext);
-        void handleWSOLVENT( const DeckKeyword& keyword, size_t currentStep, const ParseContext& parseContext);
-        void handleWTEMP( const DeckKeyword& keyword, size_t currentStep, const ParseContext& parseContext);
-        void handleWINJTEMP( const DeckKeyword& keyword, size_t currentStep, const ParseContext& parseContext);
-        void handleWCONINJH( const SCHEDULESection&,  const DeckKeyword& keyword, size_t currentStep, const ParseContext& parseContext);
-        void handleWELOPEN( const DeckKeyword& keyword, size_t currentStep, const ParseContext& parseContext );
-        void handleWELTARG( const SCHEDULESection&,  const DeckKeyword& keyword, size_t currentStep, const ParseContext& parseContext);
-        void handleGCONINJE( const SCHEDULESection&,  const DeckKeyword& keyword, size_t currentStep, const ParseContext& parseContext);
-        void handleGCONPROD( const DeckKeyword& keyword, size_t currentStep, const ParseContext& parseContext);
-        void handleGEFAC( const DeckKeyword& keyword, size_t currentStep, const ParseContext& parseContext);
-        void handleWEFAC( const DeckKeyword& keyword, size_t currentStep, const ParseContext& parseContext);
+        void handleWCONINJE( const SCHEDULESection&,  const DeckKeyword& keyword, size_t currentStep, const ParseContext& parseContext, ErrorGuard& errors);
+        void handleWPOLYMER( const DeckKeyword& keyword, size_t currentStep, const ParseContext& parseContext, ErrorGuard& errors);
+        void handleWSOLVENT( const DeckKeyword& keyword, size_t currentStep, const ParseContext& parseContext, ErrorGuard& errors);
+        void handleWTRACER( const DeckKeyword& keyword, size_t currentStep, const ParseContext& parseContext, ErrorGuard& errors);
+        void handleWTEMP( const DeckKeyword& keyword, size_t currentStep, const ParseContext& parseContext, ErrorGuard& errors);
+        void handleWPMITAB( const DeckKeyword& keyword,  const size_t currentStep, const ParseContext& parseContext, ErrorGuard& errors);
+        void handleWSKPTAB( const DeckKeyword& keyword,  const size_t currentStep, const ParseContext& parseContext, ErrorGuard& errors);
+        void handleWINJTEMP( const DeckKeyword& keyword, size_t currentStep, const ParseContext& parseContext, ErrorGuard& errors);
+        void handleWCONINJH( const SCHEDULESection&,  const DeckKeyword& keyword, size_t currentStep, const ParseContext& parseContext, ErrorGuard& errors);
+        void handleWELOPEN( const DeckKeyword& keyword, size_t currentStep, const ParseContext& parseContext, ErrorGuard& errors );
+        void handleWELTARG( const SCHEDULESection&,  const DeckKeyword& keyword, size_t currentStep, const ParseContext& parseContext, ErrorGuard& errors);
+        void handleGCONINJE( const SCHEDULESection&,  const DeckKeyword& keyword, size_t currentStep, const ParseContext& parseContext, ErrorGuard& errors);
+        void handleGCONPROD( const DeckKeyword& keyword, size_t currentStep, const ParseContext& parseContext, ErrorGuard& errors);
+        void handleGEFAC( const DeckKeyword& keyword, size_t currentStep, const ParseContext& parseContext, ErrorGuard& errors);
+        void handleWEFAC( const DeckKeyword& keyword, size_t currentStep, const ParseContext& parseContext, ErrorGuard& errors);
         void handleTUNING( const DeckKeyword& keyword, size_t currentStep);
         void handleGRUPTREE( const DeckKeyword& keyword, size_t currentStep);
         void handleGRUPNET( const DeckKeyword& keyword, size_t currentStep);
         void handleWRFT( const DeckKeyword& keyword, size_t currentStep);
-        void handleWTEST( const DeckKeyword& keyword, size_t currentStep, const ParseContext& parseContext);
+        void handleWTEST( const DeckKeyword& keyword, size_t currentStep, const ParseContext& parseContext, ErrorGuard& errors);
         void handleWRFTPLT( const DeckKeyword& keyword, size_t currentStep);
         void handleWPIMULT( const DeckKeyword& keyword, size_t currentStep);
         void handleDRSDT( const DeckKeyword& keyword, size_t currentStep);
         void handleDRVDT( const DeckKeyword& keyword, size_t currentStep);
+        void handleDRSDTR( const DeckKeyword& keyword, size_t currentStep);
+        void handleDRVDTR( const DeckKeyword& keyword, size_t currentStep);
         void handleVAPPARS( const DeckKeyword& keyword, size_t currentStep);
-        void handleWECON( const DeckKeyword& keyword, size_t currentStep, const ParseContext& parseContext);
-        void handleWHISTCTL(const ParseContext& parseContext, const DeckKeyword& keyword);
+        void handleWECON( const DeckKeyword& keyword, size_t currentStep, const ParseContext& parseContext, ErrorGuard& errors);
+        void handleWHISTCTL(const ParseContext& parseContext, ErrorGuard& errors, const DeckKeyword& keyword);
         void handleMESSAGES(const DeckKeyword& keyword, size_t currentStep);
         void handleVFPPROD(const DeckKeyword& vfpprodKeyword, const UnitSystem& unit_system, size_t currentStep);
         void handleVFPINJ(const DeckKeyword& vfpprodKeyword, const UnitSystem& unit_system, size_t currentStep);
@@ -199,7 +236,7 @@ namespace Opm
                            const SCHEDULESection& section,
                            size_t keywordIdx,
                            const DeckKeyword& keyword,
-                           const ParseContext& parseContext,
+                           const ParseContext& parseContext, ErrorGuard& errors,
                            const EclipseGrid& grid,
                            const Eclipse3DProperties& eclipseProperties,
                            const UnitSystem& unit_system,

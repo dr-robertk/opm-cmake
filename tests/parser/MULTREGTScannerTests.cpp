@@ -26,7 +26,6 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 
 #include <opm/parser/eclipse/Parser/Parser.hpp>
-#include <opm/parser/eclipse/Parser/ParseContext.hpp>
 
 #include <opm/parser/eclipse/Deck/Section.hpp>
 #include <opm/parser/eclipse/Deck/Deck.hpp>
@@ -102,7 +101,7 @@ static Opm::Deck createInvalidMULTREGTDeck() {
         "\n";
 
     Opm::Parser parser;
-    return parser.parseString(deckData, Opm::ParseContext()) ;
+    return parser.parseString(deckData) ;
 }
 
 
@@ -167,7 +166,7 @@ static Opm::Deck createNotSupportedMULTREGTDeck() {
         "\n";
 
     Opm::Parser parser;
-    return parser.parseString(deckData, Opm::ParseContext()) ;
+    return parser.parseString(deckData) ;
 }
 
 
@@ -219,7 +218,9 @@ static Opm::Deck createDefaultedRegions() {
         "/\n"
         "MULTREGT\n"
         "3  4   1.25   XYZ   ALL    F /\n"
-        "*  2   0.50   XYZ   ALL    F / -- Defaulted from region value \n"
+        "2  -1   0   XYZ   ALL    F / -- Defaulted from region value \n"
+        "1  -1   0   XYZ   ALL    F / -- Defaulted from region value \n"
+        "2  1   1      XYZ   ALL    F / Override default  \n"
         "/\n"
         "MULTREGT\n"
         "2  *   0.75   XYZ   ALL    F / -- Defaulted to region value \n"
@@ -228,7 +229,7 @@ static Opm::Deck createDefaultedRegions() {
         "\n";
 
     Opm::Parser parser;
-    return parser.parseString(deckData, Opm::ParseContext()) ;
+    return parser.parseString(deckData) ;
 }
 
 
@@ -245,8 +246,8 @@ BOOST_AUTO_TEST_CASE(DefaultedRegions) {
   keywords0.push_back( &multregtKeyword0 );
   Opm::MULTREGTScanner scanner0(props, keywords0);
   BOOST_CHECK_EQUAL( scanner0.getRegionMultiplier(grid.getGlobalIndex(0,0,1), grid.getGlobalIndex(1,0,1), Opm::FaceDir::XPlus ), 1.25);
-  BOOST_CHECK_EQUAL( scanner0.getRegionMultiplier(grid.getGlobalIndex(1,0,0), grid.getGlobalIndex(2,0,0), Opm::FaceDir::XPlus ), 0.50);
-  BOOST_CHECK_EQUAL( scanner0.getRegionMultiplier(grid.getGlobalIndex(2,0,1), grid.getGlobalIndex(2,0,0), Opm::FaceDir::ZMinus ), 0.50);
+  BOOST_CHECK_EQUAL( scanner0.getRegionMultiplier(grid.getGlobalIndex(1,0,0), grid.getGlobalIndex(2,0,0), Opm::FaceDir::XPlus ), 1.0);
+  BOOST_CHECK_EQUAL( scanner0.getRegionMultiplier(grid.getGlobalIndex(2,0,1), grid.getGlobalIndex(2,0,0), Opm::FaceDir::ZMinus ), 0.0);
 
   std::vector<const Opm::DeckKeyword*> keywords1;
   const Opm::DeckKeyword& multregtKeyword1 = deck.getKeyword( "MULTREGT", 1 );
@@ -290,7 +291,7 @@ static Opm::Deck createCopyMULTNUMDeck() {
         "\n";
 
     Opm::Parser parser;
-    return parser.parseString(deckData, Opm::ParseContext()) ;
+    return parser.parseString(deckData) ;
 }
 
 BOOST_AUTO_TEST_CASE(MULTREGT_COPY_MULTNUM) {

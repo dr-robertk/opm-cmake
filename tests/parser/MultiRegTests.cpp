@@ -26,7 +26,6 @@
 #include <boost/test/unit_test.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <opm/parser/eclipse/Parser/Parser.hpp>
-#include <opm/parser/eclipse/Parser/ParseContext.hpp>
 
 #include <opm/parser/eclipse/Deck/Section.hpp>
 #include <opm/parser/eclipse/Deck/Deck.hpp>
@@ -51,7 +50,7 @@ static Opm::Deck createDeckInvalidArray() {
         "\n";
 
     Opm::Parser parser;
-    return parser.parseString(deckData, Opm::ParseContext()) ;
+    return parser.parseString(deckData) ;
 }
 
 
@@ -72,7 +71,7 @@ static Opm::Deck createDeckInvalidRegion() {
         "\n";
 
     Opm::Parser parser;
-    return parser.parseString(deckData, Opm::ParseContext()) ;
+    return parser.parseString(deckData) ;
 }
 
 
@@ -93,7 +92,7 @@ static Opm::Deck createDeckInvalidValue() {
         "\n";
 
     Opm::Parser parser;
-    return parser.parseString(deckData, Opm::ParseContext()) ;
+    return parser.parseString(deckData) ;
 }
 
 
@@ -114,7 +113,7 @@ static Opm::Deck createDeckMissingVector() {
         "\n";
 
     Opm::Parser parser;
-    return parser.parseString(deckData, Opm::ParseContext()) ;
+    return parser.parseString(deckData) ;
 }
 
 
@@ -133,7 +132,7 @@ static Opm::Deck createDeckUnInitialized() {
         "\n";
 
     Opm::Parser parser;
-    return parser.parseString(deckData, Opm::ParseContext()) ;
+    return parser.parseString(deckData) ;
 }
 
 
@@ -147,13 +146,17 @@ static Opm::Deck createValidIntDeck() {
         " 5 5 1 /\n"
         "GRID\n"
         "DX\n"
-        "25*0.25 /\n"
+        "25*1.0 /\n"
         "DY\n"
-        "25*0.25 /\n"
+        "25*1.0 /\n"
         "DZ\n"
-        "25*0.25 /\n"
+        "25*1.0 /\n"
         "TOPS\n"
         "25*0.25 /\n"
+        "PERMY\n"
+        "   25*1.0 /\n"
+        "PORO\n"
+        "   25*1.0 /\n"
         "REGIONS\n"
         "SATNUM \n"
         "1  1  2  2 2\n"
@@ -169,6 +172,18 @@ static Opm::Deck createValidIntDeck() {
         "1  1  2  2 2\n"
         "1  1  2  2 2\n"
         "/\n"
+        "OPERNUM \n"
+        "1  2  3   4  5\n"
+        "6  7  8   9 10\n"
+        "11 12 13 14 15\n"
+        "16 17 18 19 20\n"
+        "21 22 23 24 25\n"
+        "/\n"
+        "OPERATER\n"
+        " PERMX 1 MULTX  PERMY 0.50 /\n"
+        " PERMX 2 COPY   PERMY /\n"
+        " PORV 1 'MULTX' PORV 0.50 /\n"
+        "/\n"
         "MULTIREG\n"
         "  SATNUM 11 1    M / \n"
         "  SATNUM 20 2      / \n"
@@ -177,7 +192,7 @@ static Opm::Deck createValidIntDeck() {
         "\n";
 
     Opm::Parser parser;
-    return parser.parseString(deckData, Opm::ParseContext()) ;
+    return parser.parseString(deckData) ;
 }
 
 
@@ -187,30 +202,31 @@ static Opm::Deck createValidIntDeck() {
 
 BOOST_AUTO_TEST_CASE(InvalidArrayThrows) {
     Opm::Deck deck = createDeckInvalidArray();
-    BOOST_CHECK_THROW( new Opm::EclipseState( deck, Opm::ParseContext()) , std::invalid_argument );
+    BOOST_CHECK_THROW( new Opm::EclipseState( deck) , std::invalid_argument );
 }
 
 
 BOOST_AUTO_TEST_CASE(InvalidRegionThrows) {
     Opm::Deck deck = createDeckInvalidRegion();
-    BOOST_CHECK_THROW( new Opm::EclipseState( deck, Opm::ParseContext()) , std::invalid_argument );
+    BOOST_CHECK_THROW( new Opm::EclipseState( deck) , std::invalid_argument );
 }
 
 
 BOOST_AUTO_TEST_CASE(ExpectedIntThrows) {
     Opm::Deck deck = createDeckInvalidValue();
-    BOOST_CHECK_THROW( new Opm::EclipseState( deck, Opm::ParseContext()) , std::invalid_argument );
+    BOOST_CHECK_THROW( new Opm::EclipseState( deck) , std::invalid_argument );
 }
 
 BOOST_AUTO_TEST_CASE(MissingRegionVectorThrows) {
     Opm::Deck deck = createDeckMissingVector();
-    BOOST_CHECK_THROW( new Opm::EclipseState( deck, Opm::ParseContext()) , std::invalid_argument );
+    BOOST_CHECK_THROW( new Opm::EclipseState( deck) , std::invalid_argument );
 }
 
 BOOST_AUTO_TEST_CASE(UnInitializedVectorThrows) {
     Opm::Deck deck = createDeckUnInitialized();
-    BOOST_CHECK_THROW( new Opm::EclipseState( deck, Opm::ParseContext()) , std::invalid_argument );
+    BOOST_CHECK_THROW( new Opm::EclipseState( deck) , std::invalid_argument );
 }
+
 
 BOOST_AUTO_TEST_CASE(IntSetCorrectly) {
     Opm::Deck deck = createValidIntDeck();
@@ -227,3 +243,20 @@ BOOST_AUTO_TEST_CASE(IntSetCorrectly) {
                 BOOST_CHECK_EQUAL(40, property.iget(i, j, 0));
         }
 }
+
+
+BOOST_AUTO_TEST_CASE(Test_OPERATER) {
+    Opm::Deck deck = createValidIntDeck();
+    Opm::TableManager tm(deck);
+    Opm::EclipseGrid eg(deck);
+    Opm::Eclipse3DProperties props(deck, tm, eg);
+
+    const auto& porv  = props.getDoubleGridProperty("PORV");
+    const auto& permx = props.getDoubleGridProperty("PERMX");
+    const auto& permy = props.getDoubleGridProperty("PERMY");
+
+    BOOST_CHECK_EQUAL( porv.iget(0,0,0), 0.50 );
+    BOOST_CHECK_EQUAL( permx.iget(0) / permy.iget(0), 0.50 );
+    BOOST_CHECK_EQUAL( permx.iget(1), permy.iget(1));
+}
+

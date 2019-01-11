@@ -24,7 +24,7 @@
 #define BOOST_TEST_MODULE ParseContextTests
 #include <boost/test/unit_test.hpp>
 
-
+#include <opm/parser/eclipse/Parser/ErrorGuard.hpp>
 #include <opm/parser/eclipse/Parser/Parser.hpp>
 #include <opm/parser/eclipse/Parser/ParserKeywords/D.hpp>
 #include <opm/parser/eclipse/Parser/ParserKeywords/E.hpp>
@@ -42,6 +42,9 @@
 using namespace Opm;
 
 
+
+
+
 BOOST_AUTO_TEST_CASE(TestUnkownKeyword) {
     const char * deck1 =
         "RUNSPEC\n"
@@ -56,33 +59,33 @@ BOOST_AUTO_TEST_CASE(TestUnkownKeyword) {
         "  10 10 10 /n"
         "\n";
 
-
+    ErrorGuard errors;
     ParseContext parseContext;
     Parser parser(false);
 
 
     parser.addKeyword<ParserKeywords::DIMENS>();
     parseContext.update(ParseContext::PARSE_UNKNOWN_KEYWORD , InputError::THROW_EXCEPTION );
-    BOOST_CHECK_THROW( parser.parseString( deck1 , parseContext ) , std::invalid_argument);
+    BOOST_CHECK_THROW( parser.parseString( deck1 , parseContext , errors) , std::invalid_argument);
 
     parseContext.update(ParseContext::PARSE_UNKNOWN_KEYWORD , InputError::IGNORE );
-    BOOST_CHECK_NO_THROW( parser.parseString( deck1 , parseContext ) );
+    BOOST_CHECK_NO_THROW( parser.parseString( deck1 , parseContext , errors) );
 
     parseContext.update(ParseContext::PARSE_UNKNOWN_KEYWORD , InputError::THROW_EXCEPTION );
     parseContext.update(ParseContext::PARSE_RANDOM_TEXT , InputError::IGNORE );
-    BOOST_CHECK_THROW( parser.parseString( deck2 , parseContext ) , std::invalid_argument);
+    BOOST_CHECK_THROW( parser.parseString( deck2 , parseContext , errors) , std::invalid_argument);
 
     parseContext.update(ParseContext::PARSE_UNKNOWN_KEYWORD , InputError::IGNORE );
     parseContext.update(ParseContext::PARSE_RANDOM_TEXT , InputError::IGNORE );
-    BOOST_CHECK_NO_THROW( parser.parseString( deck2 , parseContext ) );
+    BOOST_CHECK_NO_THROW( parser.parseString( deck2 , parseContext , errors) );
 
     parseContext.update(ParseContext::PARSE_UNKNOWN_KEYWORD , InputError::IGNORE );
     parseContext.update(ParseContext::PARSE_RANDOM_TEXT , InputError::THROW_EXCEPTION );
-    BOOST_CHECK_THROW( parser.parseString( deck2 , parseContext ) , std::invalid_argument);
+    BOOST_CHECK_THROW( parser.parseString( deck2 , parseContext , errors) , std::invalid_argument);
 
     parseContext.update(ParseContext::PARSE_UNKNOWN_KEYWORD , InputError::IGNORE );
     parseContext.update(ParseContext::PARSE_RANDOM_TEXT , InputError::IGNORE );
-    BOOST_CHECK_NO_THROW( parser.parseString( deck2 , parseContext ) );
+    BOOST_CHECK_NO_THROW( parser.parseString( deck2 , parseContext , errors) );
 }
 
 
@@ -94,20 +97,21 @@ BOOST_AUTO_TEST_CASE(TestUnkownKeywordII) {
         "\n";
 
 
+    ErrorGuard errors;
     ParseContext parseContext;
     Parser parser(false);
 
 
     parser.addKeyword<ParserKeywords::DIMENS>();
     parseContext.update(ParseContext::PARSE_UNKNOWN_KEYWORD , InputError::THROW_EXCEPTION );
-    BOOST_CHECK_THROW( parser.parseString( deck1 , parseContext ) , std::invalid_argument);
+    BOOST_CHECK_THROW( parser.parseString( deck1 , parseContext, errors ) , std::invalid_argument);
     parseContext.ignoreKeyword("RUNSPEC");
-    BOOST_CHECK_NO_THROW( parser.parseString( deck1 , parseContext ) );
+    BOOST_CHECK_NO_THROW( parser.parseString( deck1 , parseContext, errors ) );
 }
 
 
 BOOST_AUTO_TEST_CASE(Handle_extra_records) {
-    const char * deck_string = 
+    const char * deck_string =
          "EQLDIMS\n"
          "  2  100  20  1  1  /\n"
          "\n"
@@ -117,25 +121,26 @@ BOOST_AUTO_TEST_CASE(Handle_extra_records) {
          "  2470   382.4   1705.0  0.0    500    0.0     1     1      20 /\n"
          "GRID\n";
 
+    ErrorGuard errors;
     ParseContext parseContext;
     Parser parser(false);
-    
+
     parser.addKeyword<ParserKeywords::EQLDIMS>();
     parser.addKeyword<ParserKeywords::EQUIL>();
     parser.addKeyword<ParserKeywords::GRID>();
-    BOOST_CHECK_THROW( parser.parseString( deck_string , parseContext ) , std::invalid_argument );
+    BOOST_CHECK_THROW( parser.parseString( deck_string , parseContext, errors ) , std::invalid_argument );
 
     parseContext.update(ParseContext::PARSE_EXTRA_RECORDS , InputError::IGNORE );
-    parser.parseString( deck_string , parseContext );
+    parser.parseString( deck_string , parseContext, errors );
     BOOST_CHECK( parser.hasKeyword( "GRID" ) );
 
     parseContext.update(ParseContext::PARSE_EXTRA_RECORDS , InputError::THROW_EXCEPTION );
-    BOOST_CHECK_THROW( parser.parseString( deck_string , parseContext ) , std::invalid_argument);
+    BOOST_CHECK_THROW( parser.parseString( deck_string , parseContext, errors ) , std::invalid_argument);
 }
 
 
 BOOST_AUTO_TEST_CASE(Handle_extra_records_2) {
-    const char * deck_string = 
+    const char * deck_string =
          "EQLDIMS\n"
          "  2  100  20  1  1  /\n"
          "\n"
@@ -147,16 +152,17 @@ BOOST_AUTO_TEST_CASE(Handle_extra_records_2) {
           " 10 10 3 /\n"
           " 5 3 2 /\n";
 
+    ErrorGuard errors;
     ParseContext parseContext;
     Parser parser(false);
-    
+
     parser.addKeyword<ParserKeywords::EQLDIMS>();
     parser.addKeyword<ParserKeywords::EQUIL>();
     parser.addKeyword<ParserKeywords::GRID>();
     parser.addKeyword<ParserKeywords::DIMENS>();
 
     parseContext.update(ParseContext::PARSE_EXTRA_RECORDS , InputError::IGNORE );
-    BOOST_CHECK_THROW( parser.parseString( deck_string , parseContext ), std::invalid_argument );
+    BOOST_CHECK_THROW( parser.parseString( deck_string , parseContext, errors ), std::invalid_argument );
 }
 
 
@@ -198,6 +204,7 @@ BOOST_AUTO_TEST_CASE(TestUnkownKeyword_DATA) {
         "\n";
 
 
+    ErrorGuard errors;
     ParseContext parseContext;
     Parser parser(false);
 
@@ -207,11 +214,11 @@ BOOST_AUTO_TEST_CASE(TestUnkownKeyword_DATA) {
     parseContext.update(ParseContext::PARSE_UNKNOWN_KEYWORD , InputError::IGNORE );
     parseContext.update(ParseContext::PARSE_RANDOM_TEXT , InputError::THROW_EXCEPTION );
     {
-        Deck deck = parser.parseString( deck_string1 , parseContext );
+        Deck deck = parser.parseString( deck_string1 , parseContext, errors );
         BOOST_CHECK( deck.hasKeyword( "RUNSPEC") );
         BOOST_CHECK( deck.hasKeyword( "DIMENS") );
     }
-    BOOST_CHECK_THROW( parser.parseString( deck_string2 , parseContext ) , std::invalid_argument);
+    BOOST_CHECK_THROW( parser.parseString( deck_string2 , parseContext, errors ) , std::invalid_argument);
 }
 
 
@@ -228,22 +235,23 @@ BOOST_AUTO_TEST_CASE(TEST_UNKNOWN_OPERATE) {
         "SGU    6* MULTA  SWL   -1.0   1.0  / SGU=1-SWL\n"
         "/\n";
 
+    ErrorGuard errors;
     ParseContext parseContext;
     Parser parser(false);
 
     parseContext.update(ParseContext::PARSE_UNKNOWN_KEYWORD , InputError::THROW_EXCEPTION );
-    BOOST_CHECK_THROW( parser.parseString( deck , parseContext ) , std::invalid_argument);
+    BOOST_CHECK_THROW( parser.parseString( deck , parseContext, errors ) , std::invalid_argument);
 
     parseContext.update(ParseContext::PARSE_RANDOM_SLASH , InputError::IGNORE );
     parseContext.update(ParseContext::PARSE_UNKNOWN_KEYWORD , InputError::IGNORE );
-    parser.parseString( deck , parseContext );
-    BOOST_CHECK_NO_THROW( parser.parseString( deck , parseContext ) );
+    parser.parseString( deck , parseContext, errors );
+    BOOST_CHECK_NO_THROW( parser.parseString( deck , parseContext, errors ) );
 
     parser.addKeyword<ParserKeywords::OPERATE>();
-    parser.parseString( deck , parseContext );
+    parser.parseString( deck , parseContext, errors );
     parseContext.update(ParseContext::PARSE_RANDOM_SLASH , InputError::THROW_EXCEPTION );
     parseContext.update(ParseContext::PARSE_UNKNOWN_KEYWORD , InputError::THROW_EXCEPTION );
-    BOOST_CHECK_NO_THROW( parser.parseString( deck , parseContext ) );
+    BOOST_CHECK_NO_THROW( parser.parseString( deck , parseContext, errors ) );
 }
 
 
@@ -256,7 +264,7 @@ BOOST_AUTO_TEST_CASE( CheckMissingSizeKeyword) {
         "  10 10 10 10 / \n"
         "\n";
 
-
+    ErrorGuard errors;
     ParseContext parseContext;
     Parser parser(false);
 
@@ -265,10 +273,10 @@ BOOST_AUTO_TEST_CASE( CheckMissingSizeKeyword) {
     parser.addKeyword<ParserKeywords::SOLUTION>();
 
     parseContext.update( ParseContext::PARSE_MISSING_DIMS_KEYWORD , InputError::THROW_EXCEPTION );
-    BOOST_CHECK_THROW( parser.parseString( deck , parseContext ) , std::invalid_argument);
+    BOOST_CHECK_THROW( parser.parseString( deck , parseContext, errors ) , std::invalid_argument);
 
     parseContext.update( ParseContext::PARSE_MISSING_DIMS_KEYWORD , InputError::IGNORE );
-    BOOST_CHECK_NO_THROW( parser.parseString( deck , parseContext ) );
+    BOOST_CHECK_NO_THROW( parser.parseString( deck , parseContext, errors ) );
 }
 
 
@@ -314,23 +322,24 @@ BOOST_AUTO_TEST_CASE( CheckUnsupportedInSCHEDULE ) {
         "/\n"
         "\n";
 
-
+    ErrorGuard errors;
     ParseContext parseContext;
     Parser parser(true);
 
-    auto deckSupported = parser.parseString( deckStringSupported , parseContext );
-    auto deckUnSupported = parser.parseString( deckStringUnSupported , parseContext );
+    auto deckSupported = parser.parseString( deckStringSupported , parseContext, errors );
+    auto deckUnSupported = parser.parseString( deckStringUnSupported , parseContext, errors );
     EclipseGrid grid( deckSupported );
     TableManager table ( deckSupported );
     Eclipse3DProperties eclipseProperties ( deckSupported , table, grid);
+    Runspec runspec(deckSupported);
 
     parseContext.update( ParseContext::UNSUPPORTED_SCHEDULE_GEO_MODIFIER , InputError::IGNORE );
-    BOOST_CHECK_NO_THROW( Schedule( deckSupported  , grid , eclipseProperties, Phases(true, true, true), parseContext  ));
-    BOOST_CHECK_NO_THROW( Schedule( deckUnSupported, grid , eclipseProperties, Phases(true, true, true), parseContext  ));
+    BOOST_CHECK_NO_THROW( Schedule( deckSupported  , grid , eclipseProperties, runspec, parseContext, errors  ));
+    BOOST_CHECK_NO_THROW( Schedule( deckUnSupported, grid , eclipseProperties, runspec, parseContext, errors  ));
 
     parseContext.update( ParseContext::UNSUPPORTED_SCHEDULE_GEO_MODIFIER , InputError::THROW_EXCEPTION );
-    BOOST_CHECK_THROW( Schedule( deckUnSupported , grid , eclipseProperties, Phases(true, true, true) , parseContext), std::invalid_argument );
-    BOOST_CHECK_NO_THROW( Schedule( deckSupported , grid , eclipseProperties, Phases(true, true, true) , parseContext));
+    BOOST_CHECK_THROW( Schedule( deckUnSupported , grid , eclipseProperties, runspec , parseContext , errors), std::invalid_argument );
+    BOOST_CHECK_NO_THROW( Schedule( deckSupported , grid , eclipseProperties, runspec , parseContext, errors));
 }
 
 
@@ -349,7 +358,7 @@ BOOST_AUTO_TEST_CASE(TestRandomSlash) {
         "   /\n";
 
 
-
+    ErrorGuard errors;
     ParseContext parseContext;
     Parser parser(false);
 
@@ -359,14 +368,14 @@ BOOST_AUTO_TEST_CASE(TestRandomSlash) {
 
     parseContext.update(ParseContext::PARSE_RANDOM_SLASH , InputError::THROW_EXCEPTION);
     parseContext.update(ParseContext::PARSE_RANDOM_TEXT , InputError::IGNORE);
-    BOOST_CHECK_THROW( parser.parseString( deck1 , parseContext ) , std::invalid_argument);
-    BOOST_CHECK_THROW( parser.parseString( deck2 , parseContext ) , std::invalid_argument);
+    BOOST_CHECK_THROW( parser.parseString( deck1 , parseContext, errors ) , std::invalid_argument);
+    BOOST_CHECK_THROW( parser.parseString( deck2 , parseContext, errors ) , std::invalid_argument);
 
 
     parseContext.update(ParseContext::PARSE_RANDOM_SLASH , InputError::IGNORE);
     parseContext.update(ParseContext::PARSE_RANDOM_TEXT , InputError::THROW_EXCEPTION);
-    BOOST_CHECK_NO_THROW( parser.parseString( deck1 , parseContext ) );
-    BOOST_CHECK_NO_THROW( parser.parseString( deck2 , parseContext ) );
+    BOOST_CHECK_NO_THROW( parser.parseString( deck1 , parseContext, errors ) );
+    BOOST_CHECK_NO_THROW( parser.parseString( deck2 , parseContext, errors ) );
 }
 
 
@@ -393,18 +402,20 @@ BOOST_AUTO_TEST_CASE(TestCOMPORD) {
         "/\n";
 
     ParseContext parseContext;
+    ErrorGuard errors;
     Parser parser(true);
-    auto deck = parser.parseString( deckString , parseContext );
+    auto deck = parser.parseString( deckString , parseContext, errors );
 
     EclipseGrid grid( deck );
     TableManager table ( deck );
     Eclipse3DProperties eclipseProperties ( deck , table, grid);
+    Runspec runspec(deck);
 
     parseContext.update( ParseContext::UNSUPPORTED_COMPORD_TYPE , InputError::IGNORE);
-    BOOST_CHECK_NO_THROW( Schedule( deck , grid , eclipseProperties,  Phases(true, true, true), parseContext ));
+    BOOST_CHECK_NO_THROW( Schedule( deck , grid , eclipseProperties,  runspec, parseContext, errors ));
 
     parseContext.update( ParseContext::UNSUPPORTED_COMPORD_TYPE , InputError::THROW_EXCEPTION);
-    BOOST_CHECK_THROW( Schedule( deck,  grid , eclipseProperties, Phases(true, true, true) , parseContext), std::invalid_argument );
+    BOOST_CHECK_THROW( Schedule( deck,  grid , eclipseProperties, runspec , parseContext, errors), std::invalid_argument );
 }
 
 
@@ -474,13 +485,14 @@ BOOST_AUTO_TEST_CASE( test_too_much_data ) {
 
     ParseContext parseContext;
     Parser parser;
+    ErrorGuard errors;
 
 
     parseContext.update(ParseContext::PARSE_EXTRA_DATA , InputError::THROW_EXCEPTION );
-    BOOST_CHECK_THROW( parser.parseString( deckString , parseContext ) , std::invalid_argument);
+    BOOST_CHECK_THROW( parser.parseString( deckString , parseContext, errors ) , std::invalid_argument);
 
     parseContext.update(ParseContext::PARSE_EXTRA_DATA , InputError::IGNORE );
-    auto deck = parser.parseString( deckString , parseContext );
+    auto deck = parser.parseString( deckString , parseContext, errors );
 }
 
 
@@ -521,6 +533,7 @@ BOOST_AUTO_TEST_CASE( test_invalid_wtemplate_config ) {
 
     ParseContext parseContext;
     Parser parser;
+    ErrorGuard errors;
 
     parseContext.update(ParseContext::SCHEDULE_INVALID_NAME , InputError::THROW_EXCEPTION );
 
@@ -724,12 +737,35 @@ BOOST_AUTO_TEST_CASE( test_invalid_wtemplate_config ) {
     for (std::string sample : testSamples) {
 
         deckinput = defDeckString + sample;
-        auto deckUnSupported = parser.parseString( deckinput , parseContext );
+        auto deckUnSupported = parser.parseString( deckinput , parseContext, errors );
 
         EclipseGrid grid( deckUnSupported );
         TableManager table ( deckUnSupported );
         Eclipse3DProperties eclipseProperties ( deckUnSupported , table, grid);
+        Runspec runspec( deckUnSupported);
 
-        BOOST_CHECK_THROW( Schedule( deckUnSupported , grid , eclipseProperties, Phases(true, true, true) , parseContext), std::invalid_argument );
+        BOOST_CHECK_THROW( Schedule( deckUnSupported , grid , eclipseProperties, runspec , parseContext, errors), std::invalid_argument );
     }
+}
+
+
+/*
+  If there are errors the ErrorGuard destructor will print error messages and
+  call std::terminate(); if you do not accept the std::terminate in the
+  destructor you should call the clear() method first.
+*/
+
+
+BOOST_AUTO_TEST_CASE(Test_ERRORGUARD) {
+    ErrorGuard eg;
+
+    BOOST_CHECK(!eg);
+
+    eg.addWarning(ParseContext::SUMMARY_UNKNOWN_WELL, "Unknown well");
+    BOOST_CHECK(!eg);
+
+    eg.addError(ParseContext::SUMMARY_UNKNOWN_GROUP, "Unknwon Group");
+    BOOST_CHECK(eg);
+    eg.clear();
+    BOOST_CHECK(!eg);
 }
