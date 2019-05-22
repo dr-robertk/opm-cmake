@@ -31,10 +31,10 @@
 #include <opm/parser/eclipse/EclipseState/Grid/EclipseGrid.hpp>
 #include <opm/parser/eclipse/EclipseState/Schedule/SummaryState.hpp>
 #include <opm/parser/eclipse/EclipseState/Schedule/Schedule.hpp>
-#include <opm/parser/eclipse/EclipseState/Schedule/ActionAST.hpp>
-#include <opm/parser/eclipse/EclipseState/Schedule/ActionContext.hpp>
-#include <opm/parser/eclipse/EclipseState/Schedule/Actions.hpp>
-#include <opm/parser/eclipse/EclipseState/Schedule/ActionX.hpp>
+#include <opm/parser/eclipse/EclipseState/Schedule/Action/ActionAST.hpp>
+#include <opm/parser/eclipse/EclipseState/Schedule/Action/ActionContext.hpp>
+#include <opm/parser/eclipse/EclipseState/Schedule/Action/Actions.hpp>
+#include <opm/parser/eclipse/EclipseState/Schedule/Action/ActionX.hpp>
 #include <opm/parser/eclipse/Deck/Deck.hpp>
 #include <opm/parser/eclipse/Parser/Parser.hpp>
 #include <opm/parser/eclipse/Parser/ParseContext.hpp>
@@ -145,6 +145,7 @@ BOOST_AUTO_TEST_CASE(TestActions) {
     Opm::SummaryState st;
     Opm::ActionContext context(st);
     Opm::Actions config;
+    std::vector<std::string> matching_wells;
     BOOST_CHECK_EQUAL(config.size(), 0);
     BOOST_CHECK(config.empty());
 
@@ -165,40 +166,26 @@ BOOST_AUTO_TEST_CASE(TestActions) {
         config.add(action3);
     }
     Opm::ActionX& action2 = config.at("NAME");
+    // The action2 instance has an empty condition, so it will never evaluate to true.
     BOOST_CHECK(action2.ready(util_make_date_utc(1,7,2000)));
     BOOST_CHECK(!action2.ready(util_make_date_utc(1,6,2000)));
-    BOOST_CHECK(!action2.eval(util_make_date_utc(1,6,2000), context));
-
-    BOOST_CHECK(action2.eval(util_make_date_utc(1,8,2000), context));
-    BOOST_CHECK(!action2.ready(util_make_date_utc(1,8,2000)));
-    BOOST_CHECK(!action2.eval(util_make_date_utc(1,8,2000), context));
-
-    BOOST_CHECK(action2.ready(util_make_date_utc(3,8,2000)));
-    BOOST_CHECK(config.ready(util_make_date_utc(3,8,2000)));
-    BOOST_CHECK(action2.eval(util_make_date_utc(3,8,2000), context));
-
-    BOOST_CHECK(action2.ready(util_make_date_utc(5,8,2000)));
-    BOOST_CHECK(action2.eval(util_make_date_utc(5,8,2000), context));
-
-    BOOST_CHECK(!action2.ready(util_make_date_utc(7,8,2000)));
-    BOOST_CHECK(!action2.eval(util_make_date_utc(7,8,2000), context));
-    BOOST_CHECK(config.ready(util_make_date_utc(7,8,2000)));
+    BOOST_CHECK(!action2.eval(util_make_date_utc(1,6,2000), context, matching_wells));
 
     auto pending = config.pending( util_make_date_utc(7,8,2000));
-    BOOST_CHECK_EQUAL( pending.size(), 1);
+    BOOST_CHECK_EQUAL( pending.size(), 2);
     for (auto& ptr : pending) {
         BOOST_CHECK( ptr->ready(util_make_date_utc(7,8,2000)));
-        BOOST_CHECK( ptr->eval(util_make_date_utc(7,8,2000), context));
+        BOOST_CHECK( !ptr->eval(util_make_date_utc(7,8,2000), context, matching_wells));
     }
 
-    BOOST_CHECK(!action2.eval(util_make_date_utc(7,8,2000), context ));
+    BOOST_CHECK(!action2.eval(util_make_date_utc(7,8,2000), context, matching_wells ));
 }
 
 
 
 BOOST_AUTO_TEST_CASE(TestContext) {
     Opm::SummaryState st;
-    st.add_well_var("OP1", "WOPR", 100);
+    st.update_well_var("OP1", "WOPR", 100);
     Opm::ActionContext context(st);
 
     BOOST_REQUIRE_THROW(context.get("func", "arg"), std::out_of_range);
@@ -484,7 +471,7 @@ BOOST_AUTO_TEST_CASE(LGR) {
 
 BOOST_AUTO_TEST_CASE(ActionContextTest) {
     SummaryState st;
-    st.add("WWCT:OP1", 100);
+    st.update("WWCT:OP1", 100);
     ActionContext context(st);
 
 
@@ -498,46 +485,92 @@ BOOST_AUTO_TEST_CASE(ActionContextTest) {
 
 
 
-BOOST_AUTO_TEST_CASE(ActionValueTest) {
-    ActionValue well_values;
-    ActionValue scalar_value(200);
-    BOOST_REQUIRE_THROW(well_values.scalar(), std::invalid_argument);
-    BOOST_CHECK_EQUAL(scalar_value.scalar(), 200);
-
-    BOOST_REQUIRE_THROW(scalar_value.add_well("A", 100), std::invalid_argument);
-
-    well_values.add_well("A", 100);
-    well_values.add_well("B", 200);
-    well_values.add_well("C", 300);
-
-    std::vector<std::string> matching_wells;
-    // Invalid operator
-    BOOST_REQUIRE_THROW(well_values.eval_cmp(TokenType::number, scalar_value, matching_wells), std::invalid_argument);
-    // Right hand side is not scalar
-    BOOST_REQUIRE_THROW(well_values.eval_cmp(TokenType::op_eq, well_values, matching_wells), std::invalid_argument);
-
-    BOOST_CHECK( !well_values.eval_cmp(TokenType::op_le, ActionValue(-1), matching_wells) );
-    BOOST_CHECK_EQUAL(0, matching_wells.size());
-
-    BOOST_CHECK( well_values.eval_cmp(TokenType::op_eq, scalar_value, matching_wells) );
-    BOOST_CHECK_EQUAL(1, matching_wells.size());
-    BOOST_CHECK_EQUAL("B", matching_wells[0]);
-}
-
-
-
 BOOST_AUTO_TEST_CASE(TestMatchingWells) {
     ActionAST ast({"WOPR", "*", ">", "1.0"});
     SummaryState st;
     std::vector<std::string> matching_wells;
 
-    st.add_well_var("OPX", "WOPR", 0);
-    st.add_well_var("OPY", "WOPR", 0.50);
-    st.add_well_var("OPZ", "WOPR", 2.0);
+    st.update_well_var("OPX", "WOPR", 0);
+    st.update_well_var("OPY", "WOPR", 0.50);
+    st.update_well_var("OPZ", "WOPR", 2.0);
 
     ActionContext context(st);
     BOOST_CHECK( ast.eval(context, matching_wells) );
 
     BOOST_CHECK_EQUAL( matching_wells.size(), 1);
     BOOST_CHECK_EQUAL( matching_wells[0], "OPZ" );
+}
+
+BOOST_AUTO_TEST_CASE(TestMatchingWells2) {
+  ActionAST ast1({"WOPR", "P*", ">", "1.0"});
+  ActionAST ast2({"WOPR", "*", ">", "1.0"});
+  SummaryState st;
+  std::vector<std::string> matching_wells1;
+  std::vector<std::string> matching_wells2;
+
+  st.update_well_var("PX", "WOPR", 0);
+  st.update_well_var("PY", "WOPR", 0.50);
+  st.update_well_var("PZ", "WOPR", 2.0);
+
+  st.update_well_var("IX", "WOPR", 0);
+  st.update_well_var("IY", "WOPR", 0.50);
+  st.update_well_var("IZ", "WOPR", 2.0);
+
+  ActionContext context(st);
+  BOOST_CHECK( ast1.eval(context, matching_wells1) );
+  BOOST_CHECK_EQUAL( matching_wells1.size(), 1);
+  BOOST_CHECK_EQUAL( matching_wells1[0], "PZ" );
+
+  BOOST_CHECK( ast2.eval(context, matching_wells2) );
+  BOOST_CHECK_EQUAL( matching_wells2.size(), 2);
+  BOOST_CHECK_EQUAL( std::count(matching_wells2.begin(), matching_wells2.end(), "PZ") , 1);
+  BOOST_CHECK_EQUAL( std::count(matching_wells2.begin(), matching_wells2.end(), "IZ") , 1);
+}
+
+
+
+BOOST_AUTO_TEST_CASE(TestMatchingWells_AND) {
+    ActionAST ast({"WOPR", "*", ">", "1.0", "AND", "WWCT", "*", "<", "0.50"});
+    SummaryState st;
+    std::vector<std::string> matching_wells;
+
+    st.update_well_var("OPX", "WOPR", 0);
+    st.update_well_var("OPY", "WOPR", 0.50);
+    st.update_well_var("OPZ", "WOPR", 2.0);      // The WOPR check matches this well.
+
+    st.update_well_var("OPX", "WWCT", 1.0);
+    st.update_well_var("OPY", "WWCT", 0.0);     // The WWCT check matches this well.
+    st.update_well_var("OPZ", "WWCT", 1.0);
+
+    ActionContext context(st);
+    BOOST_CHECK( ast.eval(context, matching_wells) );
+
+    // Even though condition as a whole matches, there is no finite set of wells
+    // which mathes both conditions when combined with AND - i.e. the matching_wells
+    // variable should be empty.
+    BOOST_CHECK( matching_wells.empty() );
+}
+
+BOOST_AUTO_TEST_CASE(TestMatchingWells_OR) {
+    ActionAST ast({"WOPR", "*", ">", "1.0", "OR", "WWCT", "*", "<", "0.50"});
+    SummaryState st;
+    std::vector<std::string> matching_wells;
+
+    st.update_well_var("OPX", "WOPR", 0);
+    st.update_well_var("OPY", "WOPR", 0.50);
+    st.update_well_var("OPZ", "WOPR", 2.0);      // The WOPR check matches this well.
+
+    st.update_well_var("OPX", "WWCT", 1.0);
+    st.update_well_var("OPY", "WWCT", 0.0);     // The WWCT check matches this well.
+    st.update_well_var("OPZ", "WWCT", 1.0);
+
+    ActionContext context(st);
+    BOOST_CHECK( ast.eval(context, matching_wells) );
+
+    // The well 'OPZ' matches the first condition and the well 'OPY' matches the
+    // second condition, since the two conditions are combined with || the
+    // resulting mathcing_wells variable should contain both these wells.
+    BOOST_CHECK_EQUAL( matching_wells.size(), 2);
+    BOOST_CHECK( std::find(matching_wells.begin(), matching_wells.end(), "OPZ") != matching_wells.end());
+    BOOST_CHECK( std::find(matching_wells.begin(), matching_wells.end(), "OPY") != matching_wells.end());
 }

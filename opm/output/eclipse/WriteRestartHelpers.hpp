@@ -47,7 +47,8 @@ namespace Opm { namespace RestartIO { namespace Helpers {
     createDoubHead(const EclipseState& es,
                    const Schedule&     sched,
                    const std::size_t   lookup_step,
-                   const double        simTime);
+                   const double        simTime,
+                   const double        nextTimeStep);
 
 
 
@@ -62,17 +63,6 @@ namespace Opm { namespace RestartIO { namespace Helpers {
     std::vector<bool>
     createLogiHead(const EclipseState& es);
 
-
-    std::vector<int> serialize_ICON(int lookup_step, // The integer index used to look up dynamic properties, e.g. the number of well.
-                                    int ncwmax,      // Max number of completions per well, should be entry 17 from createInteHead.
-                                    int niconz,      // Number of elements per completion in ICON, should be entry 32 from createInteHead.
-                                    const std::vector<const Well*>& sched_wells);
-
-    std::vector<double> serialize_SCON(int lookup_step, // The integer index used to look up dynamic properties, e.g. the number of well.
-                                       int ncwmax,      // Max number of completions per well, should be entry 17 from createInteHead.
-                                       int nsconz,      // Number of elements per completion in SCON, should be entry 33 from createInteHead.
-                                       const std::vector<const Well*>& sched_wells,
-                                       const UnitSystem& units);
 
 }}} // Opm::RestartIO::Helpers
 

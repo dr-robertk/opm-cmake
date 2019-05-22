@@ -27,7 +27,7 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 
 
-#include <opm/parser/eclipse/EclipseState/Schedule/Well.hpp>
+#include <opm/parser/eclipse/EclipseState/Schedule/Well/Well.hpp>
 #include <opm/parser/eclipse/EclipseState/Schedule/TimeMap.hpp>
 #include <opm/parser/eclipse/EclipseState/Schedule/DynamicState.hpp>
 
@@ -232,6 +232,8 @@ BOOST_AUTO_TEST_CASE( find ) {
 
     BOOST_CHECK_EQUAL( state.find( 137 ) , 0 );
     BOOST_CHECK_EQUAL( state.find( 200 ) , -1 );
+    BOOST_CHECK_EQUAL( state.find_not(137), -1);
+    BOOST_CHECK_EQUAL( state.find_not(200), 0);
     state.update( 0 , 200 );
     BOOST_CHECK_EQUAL( state.find( 137 ) , -1 );
     BOOST_CHECK_EQUAL( state.find( 200 ) ,  0 );
@@ -239,12 +241,17 @@ BOOST_AUTO_TEST_CASE( find ) {
     state.update( 2 , 300 );
     BOOST_CHECK_EQUAL( state.find( 200 ) ,  0 );
     BOOST_CHECK_EQUAL( state.find( 300 ) ,  2 );
+    BOOST_CHECK_EQUAL( state.find_not( 200 ) ,  2 );
 
     state.update( 4 , 400 );
     BOOST_CHECK_EQUAL( state.find( 200 ) ,  0 );
     BOOST_CHECK_EQUAL( state.find( 300 ) ,  2 );
     BOOST_CHECK_EQUAL( state.find( 400 ) ,  4 );
     BOOST_CHECK_EQUAL( state.find( 500 ) ,  -1 );
+
+
+    auto pred = [] (const int& elm) { return elm == 400 ;};
+    BOOST_CHECK_EQUAL( state.find_if(pred), 4);
 }
 
 
@@ -304,3 +311,28 @@ BOOST_AUTO_TEST_CASE( update_equal ) {
     BOOST_CHECK_EQUAL(state[9] , 200);
     BOOST_CHECK_EQUAL(state[10], 200);
 }
+
+
+
+
+
+BOOST_AUTO_TEST_CASE( UNIQUE ) {
+    const std::time_t startDate = Opm::TimeMap::mkdate(2010, 1, 1);
+    Opm::TimeMap timeMap{ startDate };
+    for (size_t i = 0; i < 10; i++)
+        timeMap.addTStep((i+1) * 24 * 60 * 60);
+
+    Opm::DynamicState<int> state(timeMap , 13);
+    auto unique0 = state.unique();
+    BOOST_CHECK_EQUAL(unique0.size(), 1);
+    BOOST_CHECK(unique0[0] == std::make_pair(std::size_t{0}, 13));
+
+    state.update(3,300);
+    state.update(6,600);
+    auto unique1 = state.unique();
+    BOOST_CHECK_EQUAL(unique1.size(), 3);
+    BOOST_CHECK(unique1[0] == std::make_pair(std::size_t{0}, 13));
+    BOOST_CHECK(unique1[1] == std::make_pair(std::size_t{3}, 300));
+    BOOST_CHECK(unique1[2] == std::make_pair(std::size_t{6}, 600));
+}
+

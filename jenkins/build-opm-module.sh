@@ -2,6 +2,10 @@
 
 declare -A configurations
 
+declare -A EXTRA_MODULE_FLAGS
+EXTRA_MODULE_FLAGS[opm-common]="-DENABLE_WELL_TEST=ON"
+EXTRA_MODULE_FLAGS[opm-simulators]="-DBUILD_EBOS_EXTENSIONS=ON -DBUILD_EBOS_DEBUG_EXTENSIONS=ON"
+
 # Parse revisions from trigger comment and setup arrays
 # Depends on: 'upstreams', upstreamRev',
 #             'downstreams', 'downstreamRev',
@@ -79,10 +83,26 @@ function printHeader {
 # $2 = 0 to build and install module, 1 to build and test module
 # $3 = Source root of module to build
 function build_module {
-  cmake $3 -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=$2 -DCMAKE_TOOLCHAIN_FILE=${configurations[$configuration]} $1
+  CMAKE_PARAMS="$1"
+  DO_TEST_FLAG="$2"
+  MOD_SRC_DIR="$3"
+  cmake "$MOD_SRC_DIR" -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=$DO_TEST_FLAG -DCMAKE_TOOLCHAIN_FILE=${configurations[$configuration]} $CMAKE_PARAMS
   test $? -eq 0 || exit 1
-  if test $2 -eq 1
+  if test $DO_TEST_FLAG -eq 1
   then
+
+    pushd "$CWD"
+    cd "$MOD_SRC_DIR"
+    if test -x "./jenkins/pre-build.sh"; then
+        echo "Running pre-build script"
+        if ! "./jenkins/pre-build.sh"; then
+            exit 1
+        fi
+    else
+        echo "No pre-build script detected"
+    fi
+    popd
+
     if [ ! -z $BUILDTHREADS ]
     then
       cmake --build . -- -j$BUILDTHREADS
@@ -164,7 +184,7 @@ function build_upstreams {
   do
     echo "Building upstream $upstream=${upstreamRev[$upstream]} configuration=$configuration"
     # Build upstream and execute installation
-    clone_and_build_module $upstream "-DCMAKE_PREFIX_PATH=$WORKSPACE/$configuration/install -DCMAKE_INSTALL_PREFIX=$WORKSPACE/$configuration/install" ${upstreamRev[$upstream]} $WORKSPACE/$configuration
+    clone_and_build_module $upstream "-DCMAKE_PREFIX_PATH=$WORKSPACE/$configuration/install -DCMAKE_INSTALL_PREFIX=$WORKSPACE/$configuration/install ${EXTRA_MODULE_FLAGS[$upstream]}" ${upstreamRev[$upstream]} $WORKSPACE/$configuration
     test $? -eq 0 || exit 1
   done
   test $? -eq 0 || exit 1
@@ -179,7 +199,7 @@ function build_downstreams {
   do
     echo "Building downstream $downstream=${downstreamRev[$downstream]} configuration=$configuration"
     # Build downstream and execute installation
-    clone_and_build_module $downstream "-DCMAKE_PREFIX_PATH=$WORKSPACE/$configuration/install -DCMAKE_INSTALL_PREFIX=$WORKSPACE/$configuration/install -DOPM_TESTS_ROOT=$OPM_TESTS_ROOT" ${downstreamRev[$downstream]} $WORKSPACE/$configuration 1
+    clone_and_build_module $downstream "-DCMAKE_PREFIX_PATH=$WORKSPACE/$configuration/install -DCMAKE_INSTALL_PREFIX=$WORKSPACE/$configuration/install -DOPM_TESTS_ROOT=$OPM_TESTS_ROOT ${EXTRA_MODULE_FLAGS[$downstream]}" ${downstreamRev[$downstream]} $WORKSPACE/$configuration 1
     test $? -eq 0 || exit 1
 
     # Installation for downstream
@@ -216,7 +236,7 @@ function build_module_full {
     mkdir -p $configuration/build-$1
     cd $configuration/build-$1
     echo "Building main module $1=$sha1 configuration=$configuration"
-    build_module "-DCMAKE_INSTALL_PREFIX=$WORKSPACE/$configuration/install -DOPM_TESTS_ROOT=$OPM_TESTS_ROOT" 1 $WORKSPACE
+    build_module "-DCMAKE_INSTALL_PREFIX=$WORKSPACE/$configuration/install -DOPM_TESTS_ROOT=$OPM_TESTS_ROOT ${EXTRA_MODULE_FLAGS[$1]}" 1 $WORKSPACE
     test $? -eq 0 || exit 1
     cmake --build . --target install
     test $? -eq 0 || exit 1

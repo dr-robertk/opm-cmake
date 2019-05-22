@@ -1,6 +1,22 @@
 START
 10 MAI 2007 /
 
+RUNSPEC
+
+DIMENS
+ 20 40 1 / 
+
+GRID
+
+
+PERMX
+  800*0.25 /
+
+COPY
+  PERMX PERMY /
+  PERMX PERMZ /
+/
+
 
 SCHEDULE
 
@@ -70,7 +86,7 @@ WELOPEN
 /
 
 WCONHIST
-   'W3'      'SHUT' /
+   'W3'      'SHUT' 'ORAT'/
 /
 
 

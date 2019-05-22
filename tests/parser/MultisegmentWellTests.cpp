@@ -32,8 +32,8 @@
 #include <opm/parser/eclipse/Deck/DeckRecord.hpp>
 #include <opm/parser/eclipse/Deck/DeckKeyword.hpp>
 
-#include <opm/parser/eclipse/EclipseState/Schedule/Connection.hpp>
-#include <opm/parser/eclipse/EclipseState/Schedule/WellConnections.hpp>
+#include <opm/parser/eclipse/EclipseState/Schedule/Well/Connection.hpp>
+#include <opm/parser/eclipse/EclipseState/Schedule/Well/WellConnections.hpp>
 #include <opm/parser/eclipse/EclipseState/Schedule/ScheduleEnums.hpp>
 
 #include <opm/parser/eclipse/Parser/Parser.hpp>
@@ -42,7 +42,7 @@
 
 BOOST_AUTO_TEST_CASE(MultisegmentWellTest) {
     Opm::WellCompletion::DirectionEnum dir = Opm::WellCompletion::DirectionEnum::Z;
-    Opm::WellConnections connection_set;
+    Opm::WellConnections connection_set(10,10);
     Opm::EclipseGrid grid(20,20,20);
     connection_set.add(Opm::Connection( 19, 0, 0, 1, 0.0, Opm::WellCompletion::OPEN , 200, 17.29, 0.25, 0.0, 0.0, 0, dir,0, 0., 0., true) );
     connection_set.add(Opm::Connection( 19, 0, 1, 1, 0.0, Opm::WellCompletion::OPEN , 200, 17.29, 0.25, 0.0, 0.0, 0, dir,0, 0., 0., true) );
@@ -87,8 +87,7 @@ BOOST_AUTO_TEST_CASE(MultisegmentWellTest) {
     segment_set.loadWELSEGS(welsegs);
 
     BOOST_CHECK_EQUAL(6U, segment_set.size());
-    std::size_t totNC = 0;
-    const Opm::WellConnections * new_connection_set = Opm::newConnectionsWithSegments(compsegs, connection_set, segment_set, grid, totNC);
+    const Opm::WellConnections * new_connection_set = Opm::newConnectionsWithSegments(compsegs, connection_set, segment_set, grid);
 
     BOOST_CHECK_EQUAL(7U, new_connection_set->size());
 

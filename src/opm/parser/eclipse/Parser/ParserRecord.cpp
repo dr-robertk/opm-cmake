@@ -46,6 +46,10 @@ namespace {
         return m_items.size();
     }
 
+    bool ParserRecord::slashTerminatedRecords() const {
+        return this->slash_terminated_records;
+    }
+
     void ParserRecord::addItem( ParserItem item ) {
         if (m_dataRecord)
             throw std::invalid_argument("Record is already marked as DataRecord - can not add items");
@@ -56,6 +60,9 @@ namespace {
 
         if( itr != this->m_items.end() )
             throw std::invalid_argument("Itemname: " + item.name() + " already exists.");
+
+        if (item.parseRaw())
+            this->slash_terminated_records = false;
 
         this->m_items.push_back( std::move( item ) );
     }
@@ -88,15 +95,29 @@ namespace {
 
 
     void ParserRecord::applyUnitsToDeck( Deck& deck, DeckRecord& deckRecord ) const {
-        for( const auto& item : *this ) {
-            if( !item.hasDimension() ) continue;
+        for( const auto& parser_item : *this ) {
+            if( !parser_item.hasDimension() ) continue;
 
-            auto& deckItem = deckRecord.getItem( item.name() );
-
-            for (size_t idim = 0; idim < item.numDimensions(); idim++) {
-                auto activeDimension  = deck.getActiveUnitSystem().getNewDimension( item.getDimension(idim) );
-                auto defaultDimension = deck.getDefaultUnitSystem().getNewDimension( item.getDimension(idim) );
+            auto& deckItem = deckRecord.getItem( parser_item.name() );
+            for (size_t idim = 0; idim < parser_item.numDimensions(); idim++) {
+                auto activeDimension  = deck.getActiveUnitSystem().getNewDimension( parser_item.getDimension(idim) );
+                auto defaultDimension = deck.getDefaultUnitSystem().getNewDimension( parser_item.getDimension(idim) );
                 deckItem.push_backDimension( activeDimension , defaultDimension );
+            }
+
+            /*
+              A little special casing ... the UDAValue elements in the deck must
+              carry their own dimension. Observe that the
+              ParserItem::setSizeType() method guarantees that UDA data is
+              scalar, i.e. this special case loop can be simpler than the
+              general code in the block above.
+            */
+            if (parser_item.dataType() == type_tag::uda && deckItem.size() > 0) {
+                auto uda = deckItem.get<UDAValue>(0);
+                if (deckItem.defaultApplied(0))
+                    uda.set_dim( deck.getDefaultUnitSystem().getNewDimension( parser_item.getDimension(0)));
+                else
+                    uda.set_dim( deck.getActiveUnitSystem().getNewDimension( parser_item.getDimension(0)));
             }
         }
     }

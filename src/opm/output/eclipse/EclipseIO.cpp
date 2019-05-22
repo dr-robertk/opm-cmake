@@ -31,15 +31,18 @@
 #include <opm/parser/eclipse/EclipseState/EclipseState.hpp>
 #include <opm/parser/eclipse/EclipseState/IOConfig/IOConfig.hpp>
 #include <opm/parser/eclipse/EclipseState/Grid/GridProperty.hpp>
-#include <opm/parser/eclipse/EclipseState/Schedule/WellConnections.hpp>
+#include <opm/parser/eclipse/EclipseState/Runspec.hpp>
 #include <opm/parser/eclipse/EclipseState/Schedule/Schedule.hpp>
 #include <opm/parser/eclipse/EclipseState/Schedule/ScheduleEnums.hpp>
-#include <opm/parser/eclipse/EclipseState/Schedule/Well.hpp>
+#include <opm/parser/eclipse/EclipseState/Schedule/Well/Well.hpp>
+#include <opm/parser/eclipse/EclipseState/Schedule/Well/WellConnections.hpp>
 #include <opm/parser/eclipse/Utility/Functional.hpp>
 
+#include <opm/output/eclipse/LogiHEAD.hpp>
 #include <opm/output/eclipse/RestartIO.hpp>
 #include <opm/output/eclipse/Summary.hpp>
 #include <opm/output/eclipse/Tables.hpp>
+#include <opm/output/eclipse/WriteRestartHelpers.hpp>
 
 #include <cstdlib>
 #include <memory>     // unique_ptr
@@ -50,6 +53,7 @@
 #include <ert/ecl/EclFilename.hpp>
 
 #include <ert/ecl/ecl_kw_magic.h>
+#include <ert/ecl/ecl_kw.h>
 #include <ert/ecl/ecl_init_file.h>
 #include <ert/ecl/ecl_file.h>
 #include <ert/ecl/ecl_grid.h>
@@ -92,8 +96,95 @@ void writeKeyword( ERT::FortIO& fortio ,
 
 }
 
+    void writeKeyword(ERT::FortIO&             fortio,
+                      const std::string&       keywordName,
+                      const std::vector<bool>& data)
+    {
+        auto freeKw = [](ecl_kw_type* kw)
+        {
+            if (kw != nullptr) { ecl_kw_free(kw); }
+        };
 
+        using KWPtr =
+            std::unique_ptr<ecl_kw_type, decltype(freeKw)>;
 
+        auto kw = KWPtr {
+            ecl_kw_alloc(keywordName.c_str(), data.size(), ECL_BOOL),
+            freeKw
+        };
+
+        if (kw == nullptr) { return; }
+
+        const auto n = data.size();
+        for (auto i = 0*n; i < n; ++i) {
+            ecl_kw_iset_bool(kw.get(), static_cast<int>(i), data[i]);
+        }
+
+        ecl_kw_fwrite(kw.get(), fortio.get());
+    }
+
+    void writeInitFileHeader(const ::Opm::EclipseState& es,
+                             const ::Opm::EclipseGrid&  grid,
+                             const ::Opm::Schedule&     sched,
+                             ERT::FortIO&               fortio)
+    {
+        // Expected order of header vectors:
+        //   1. INTEHEAD
+        //   2. LOGIHEAD
+        //   3. DOUBHEAD
+
+        // INTEHEAD
+        {
+            const auto ih = ::Opm::RestartIO::Helpers::
+                createInteHead(es, grid, sched, 0.0, 0, 0);
+
+            writeKeyword(fortio, "INTEHEAD", ih);
+        }
+
+        // LOGIHEAD
+        {
+            const auto& tabMgr = es.getTableManager();
+            const auto& rspec  = es.runspec();
+            const auto& phases = rspec.phases();
+            const auto& wsd    = rspec.wellSegmentDimensions();
+
+            auto pvt = ::Opm::RestartIO::LogiHEAD::PVTModel{};
+
+            pvt.isLiveOil = phases.active(::Opm::Phase::OIL) &&
+                !tabMgr.getPvtoTables().empty();
+
+            pvt.isWetGas = phases.active(::Opm::Phase::GAS) &&
+                !tabMgr.getPvtgTables().empty();
+
+            pvt.constComprOil = phases.active(::Opm::Phase::OIL) &&
+                !(pvt.isLiveOil ||
+                  tabMgr.hasTables("PVDO") ||
+                  tabMgr.getPvcdoTable().empty());
+
+            auto lh = ::Opm::RestartIO::LogiHEAD{}
+                 .variousParam(false, false,
+                               wsd.maxSegmentedWells(),
+                               rspec.hysterPar().active());
+
+            // Sequenced after 'lh' constructor to ensure that any changes
+            // to live oil/wet gas elements are from this particular call.
+            lh.pvtModel(pvt);
+
+            writeKeyword(fortio, "LOGIHEAD", lh.data());
+        }
+
+        // DOUBHEAD
+        {
+            const auto dh = ::Opm::RestartIO::Helpers::
+                createDoubHead(es, sched, 0, 0.0, 0.0);
+
+            // DOUBHEAD must be output as double precision so we can't use
+            // writeKeyword() here (double -> float conversion).
+            ERT::EclKW<double> kw("DOUBHEAD", dh);
+
+            kw.fwrite(fortio);
+        }
+    }
 
 
 class RFT {
@@ -102,9 +193,9 @@ class RFT {
          const std::string&  basename,
          bool format );
 
-        void writeTimeStep( std::vector< const Well* >,
+        void writeTimeStep( const Schedule& schedule,
                             const EclipseGrid& grid,
-                            int report_step,
+                            std::size_t report_step,
                             time_t current_time,
                             double days,
                             const UnitSystem& units,
@@ -123,35 +214,34 @@ class RFT {
 {}
 
 
-void RFT::writeTimeStep( std::vector< const Well* > wells,
+void RFT::writeTimeStep( const Schedule& schedule,
                          const EclipseGrid& grid,
-                         int report_step,
+                         std::size_t report_step,
                          time_t current_time,
                          double days,
                          const UnitSystem& units,
                          data::Wells wellDatas) {
     using rft = ERT::ert_unique_ptr< ecl_rft_node_type, ecl_rft_node_free >;
+    const auto& rft_config = schedule.rftConfig();
+    auto well_names = schedule.wellNames(report_step);
+    if (!rft_config.active(report_step))
+        return;
 
     fortio_type * fortio;
-    int first_report_step = report_step;
 
-    for (const auto* well : wells)
-        first_report_step = std::min( first_report_step, well->firstRFTOutput());
-
-    if (report_step > first_report_step)
+    if (report_step > rft_config.firstRFTOutput())
         fortio = fortio_open_append( filename.c_str() , fmt_file , ECL_ENDIAN_FLIP );
     else
         fortio = fortio_open_writer( filename.c_str() , fmt_file , ECL_ENDIAN_FLIP );
 
-    for ( const auto& well : wells ) {
-        if( !( well->getRFTActive( report_step )
-            || well->getPLTActive( report_step ) ) )
+    for ( const auto& well_name : well_names ) {
+
+        if (!(rft_config.rft(well_name, report_step) || rft_config.plt(well_name, report_step)))
             continue;
 
-        auto* rft_node = ecl_rft_node_alloc_new( well->name().c_str(), "RFT",
-                current_time, days );
-
-        const auto& wellData = wellDatas.at(well->name());
+        auto* well = schedule.getWell(well_name);
+        rft rft_node(ecl_rft_node_alloc_new( well_name.c_str(), "RFT", current_time, days ));
+        const auto& wellData = wellDatas.at(well_name);
 
         if (wellData.connections.empty())
             continue;
@@ -181,11 +271,10 @@ void RFT::writeTimeStep( std::vector< const Well* > wells,
             auto* cell = ecl_rft_cell_alloc_RFT(
                             i, j, k, depth, press, satwat, satgas );
 
-            ecl_rft_node_append_cell( rft_node, cell );
+            ecl_rft_node_append_cell( rft_node.get(), cell );
         }
 
-        rft ecl_node( rft_node );
-        ecl_rft_node_fwrite( ecl_node.get(), fortio, units.getEclType() );
+        ecl_rft_node_fwrite( rft_node.get(), fortio, units.getEclType() );
     }
 
     fortio_fclose( fortio );
@@ -245,29 +334,20 @@ void EclipseIO::Impl::writeINITFile( const data::Solution& simProps, std::map<st
                         ioConfig.getFMTOUT(),
                         ECL_ENDIAN_FLIP );
 
+    writeInitFileHeader(this->es, this->grid, this->schedule, fortio);
 
-    // Write INIT header. Observe that the PORV vector is treated
-    // specially; that is because for this particulat vector we write
-    // a total of nx*ny*nz values, where the PORV vector has been
-    // explicitly set to zero for inactive cells. The convention is
-    // that the active/inactive cell mapping can be inferred by
-    // reading the PORV vector.
+    // The PORV vector is a special case.  This particular vector always
+    // holds a total of nx*ny*nz elements, and the elements are explicitly
+    // set to zero for inactive cells.  This treatment implies that the
+    // active/inactive cell mapping can be inferred by reading the PORV
+    // vector from the result set.
     {
-
         const auto& opm_data = this->es.get3DProperties().getDoubleGridProperty("PORV").getData();
         auto ecl_data = opm_data;
 
         for (size_t global_index = 0; global_index < opm_data.size(); global_index++)
             if (!this->grid.cellActive( global_index ))
                 ecl_data[global_index] = 0;
-
-
-        ecl_init_file_fwrite_header( fortio.get(),
-                                     this->grid.c_ptr(),
-                                     NULL,
-                                     units.getEclType(),
-                                     this->es.runspec( ).eclPhaseMask( ),
-                                     this->schedule.posixStartTime( ));
 
         units.from_si( UnitSystem::measure::volume, ecl_data );
         writeKeyword( fortio, "PORV" , ecl_data );
@@ -320,9 +400,7 @@ void EclipseIO::Impl::writeINITFile( const data::Solution& simProps, std::map<st
     // Write tables
     {
         Tables tables( this->es.getUnits() );
-        tables.addPVTO( this->es.getTableManager().getPvtoTables() );
-        tables.addPVTG( this->es.getTableManager().getPvtgTables() );
-        tables.addPVTW( this->es.getTableManager().getPvtwTable() );
+        tables.addPVTTables(this->es);
         tables.addDensity( this->es.getTableManager().getDensityTable( ) );
         tables.addSatFunc(this->es);
         fwrite(tables, fortio);
@@ -471,19 +549,13 @@ void EclipseIO::writeTimeStep(int report_step,
     if( isSubstep )
         return;
 
-    {
-        std::vector<const Well*> sched_wells = this->impl->schedule.getWells( report_step );
-        const auto rft_active = [report_step] (const Well* w) { return w->getRFTActive( report_step ) || w->getPLTActive( report_step ); };
-        if (std::any_of(sched_wells.begin(), sched_wells.end(), rft_active)) {
-            this->impl->rft.writeTimeStep( sched_wells,
-                                           grid,
-                                           report_step,
-                                           secs_elapsed + this->impl->schedule.posixStartTime(),
-                                           units.from_si( UnitSystem::measure::time, secs_elapsed ),
-                                           units,
-                                           value.wells );
-        }
-    }
+    this->impl->rft.writeTimeStep( schedule,
+                                   grid,
+                                   report_step,
+                                   secs_elapsed + this->impl->schedule.posixStartTime(),
+                                   units.from_si( UnitSystem::measure::time, secs_elapsed ),
+                                   units,
+                                   value.wells );
 
  }
 
@@ -500,7 +572,14 @@ RestartValue EclipseIO::loadRestart(const std::vector<RestartKey>& solution_keys
                                                                         report_step,
                                                                         false );
 
-    return RestartIO::load( filename , report_step , solution_keys , es, grid , schedule, extra_keys);
+    auto rst = RestartIO::load(filename, report_step, solution_keys,
+                               es, grid, schedule, extra_keys);
+
+    // Technically a violation of 'const'.  Allowed because 'impl' is
+    // constant pointer to mutable Impl.
+    this->impl->summary.reset_cumulative_quantities(rst.second);
+
+    return std::move(rst.first);
 }
 
 EclipseIO::EclipseIO( const EclipseState& es,
@@ -524,6 +603,11 @@ EclipseIO::EclipseIO( const EclipseState& es,
                                       + outputDir + "' is not a directory");
         }
     }
+}
+
+
+const SummaryState& EclipseIO::summaryState() const {
+    return this->impl->summary.get_restart_vectors();
 }
 
 

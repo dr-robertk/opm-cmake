@@ -7,7 +7,12 @@ set(OPM_MACROS_ROOT ${PROJECT_SOURCE_DIR})
 
 option(ENABLE_ECL_INPUT "Enable eclipse input support?" ON)
 option(ENABLE_ECL_OUTPUT "Enable eclipse output support?" ON)
-option(ENABLE_MOCKSIM "Build the mock simulator for io testing" OFF)
+option(ENABLE_MOCKSIM "Build the mock simulator for io testing" ON)
+option(ENABLE_WELL_TEST "Enable testing of well code when building Schedule object" OFF)
+
+if (ENABLE_WELL_TEST)
+  add_definitions(-DWELL_TEST)
+endif()
 
 # Output implies input
 if(ENABLE_ECL_OUTPUT)
@@ -143,46 +148,40 @@ if (ENABLE_MOCKSIM)
   set(_libs mocksim opmcommon
     ${Boost_UNIT_TEST_FRAMEWORK_LIBRARY})
 
-  foreach( test test_msim)
-     add_executable(${test} "tests/msim/${test}")
-     target_link_libraries(${test} ${_libs})
-     add_test(NAME ${test} COMMAND ${test})
-     set_tests_properties(${test} PROPERTIES WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
-
-     if(HAVE_DYNAMIC_BOOST_TEST)
-       set_target_properties(${test} PROPERTIES
-                             COMPILE_DEFINITIONS BOOST_TEST_DYN_LINK)
-     endif()
+  foreach( test test_msim test_msim_ACTIONX )
+    opm_add_test(${test} SOURCES tests/msim/${test}
+                         LIBRARIES ${_libs}
+                         WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
   endforeach()
 endif()
 
 # Build the compare utilities
 if(ENABLE_ECL_INPUT)
   add_library(testutil STATIC
+              examples/test_util/EclFile.cpp
               examples/test_util/EclFilesComparator.cpp
-              examples/test_util/EclIntegrationTest.cpp
+              examples/test_util/EclOutput.cpp
               examples/test_util/EclRegressionTest.cpp
-              examples/test_util/summaryComparator.cpp
-              examples/test_util/summaryIntegrationTest.cpp
-              examples/test_util/summaryRegressionTest.cpp)
-  target_link_libraries(testutil ecl)
-  add_executable(compareECL examples/test_util/compareECL.cpp)
-  target_link_libraries(compareECL testutil opmcommon)
+              examples/test_util/EclUtil.cpp
+              examples/test_util/EGrid.cpp
+              examples/test_util/ERft.cpp
+              examples/test_util/ERst.cpp
+              examples/test_util/ESmry.cpp)
+  foreach(target compareECL convertECL)
+    add_executable(${target} examples/test_util/${target}.cpp)
+    target_link_libraries(${target} testutil opmcommon)
+    install(TARGETS ${target} DESTINATION bin)
+  endforeach()
 
   # Add the tests
   set(_libs testutil opmcommon
             ${Boost_UNIT_TEST_FRAMEWORK_LIBRARY})
-  opm_add_test(test_compareSummary CONDITION ENABLE_ECL_INPUT
-                                   LIBRARIES ${_libs})
-  opm_add_test(test_EclFilesComparator CONDITION ENABLE_ECL_INPUT
-                                       LIBRARIES ${_libs})
-  if(HAVE_DYNAMIC_BOOST_TEST)
-    set_target_properties(test_compareSummary PROPERTIES
-                          COMPILE_DEFINITIONS BOOST_TEST_DYN_LINK)
-    set_target_properties(test_EclFilesComparator PROPERTIES
-                          COMPILE_DEFINITIONS BOOST_TEST_DYN_LINK)
-  endif()
-  install(TARGETS compareECL DESTINATION bin)
+  foreach(test test_EclFilesComparator test_EclIO test_EclRegressionTest
+               test_EGrid test_ERft test_ERst test_ESmry)
+    opm_add_test(${test} CONDITION ENABLE_ECL_INPUT
+                         LIBRARIES ${_libs}
+                         WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+  endforeach()
 endif()
 
 # Install build system files

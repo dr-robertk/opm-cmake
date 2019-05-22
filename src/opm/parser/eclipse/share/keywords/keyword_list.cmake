@@ -98,10 +98,12 @@ set( keywords
      000_Eclipse100/F/FAULTS
      000_Eclipse100/F/FIELD
      000_Eclipse100/F/FIELD_PROBE
+     000_Eclipse100/F/FILEUNIT
      000_Eclipse100/F/FILLEPS
      000_Eclipse100/F/FIPOWG
      000_Eclipse100/F/FIP_PROBE
      000_Eclipse100/F/FLUXNUM
+     000_Eclipse100/F/FLUXTYPE
      000_Eclipse100/F/FMTIN
      000_Eclipse100/F/FMTOUT
      000_Eclipse100/F/FMWSET
@@ -137,11 +139,13 @@ set( keywords
      000_Eclipse100/I/IPCW
      000_Eclipse100/I/ISGCR
      000_Eclipse100/I/ISGL
+     000_Eclipse100/I/ISGLPC
      000_Eclipse100/I/ISGU
      000_Eclipse100/I/ISOGCR
      000_Eclipse100/I/ISOWCR
      000_Eclipse100/I/ISWCR
      000_Eclipse100/I/ISWL
+     000_Eclipse100/I/ISWLPC
      000_Eclipse100/I/ISWU
      000_Eclipse100/J/JFUNC
      000_Eclipse100/L/LAB
@@ -164,6 +168,8 @@ set( keywords
      000_Eclipse100/M/MSFN
      000_Eclipse100/M/MSGFILE
      000_Eclipse100/M/MULTFLT
+     000_Eclipse100/M/MULTIN
+     000_Eclipse100/M/MULTOUT
      000_Eclipse100/M/MULTIPLY
      000_Eclipse100/M/MULTIREG
      000_Eclipse100/M/MULTNUM
@@ -196,6 +202,7 @@ set( keywords
      000_Eclipse100/O/OPERNUM
      000_Eclipse100/O/OPTIONS
      000_Eclipse100/O/OUTRAD
+     000_Eclipse100/O/OVERBURD
      000_Eclipse100/P/PARALLEL
      000_Eclipse100/P/PATHS
      000_Eclipse100/P/PBVD
@@ -252,10 +259,13 @@ set( keywords
      000_Eclipse100/R/RESTART
      000_Eclipse100/R/RKTRMDIR
      000_Eclipse100/R/ROCK
+     000_Eclipse100/R/ROCK2D
+     000_Eclipse100/R/ROCK2DTR
      000_Eclipse100/R/ROCKCOMP
      000_Eclipse100/R/ROCKNUM
      000_Eclipse100/R/ROCKOPTS
      000_Eclipse100/R/ROCKTAB
+     000_Eclipse100/R/ROCKWNOD
      000_Eclipse100/R/RPTGRID
      000_Eclipse100/R/RPTONLY
      000_Eclipse100/R/RPTONLYO
@@ -290,6 +300,7 @@ set( keywords
      000_Eclipse100/S/SGCWMIS
      000_Eclipse100/S/SGFN
      000_Eclipse100/S/SGL
+     000_Eclipse100/S/SGLPC
      000_Eclipse100/S/SGOF
      000_Eclipse100/S/SGU
      000_Eclipse100/S/SGWFN
@@ -326,6 +337,7 @@ set( keywords
      000_Eclipse100/S/SWCR
      000_Eclipse100/S/SWFN
      000_Eclipse100/S/SWL
+     000_Eclipse100/S/SWLPC
      000_Eclipse100/S/SWOF
      000_Eclipse100/S/SWU
      000_Eclipse100/T/TABDIMS
@@ -334,6 +346,7 @@ set( keywords
      000_Eclipse100/T/THCONR
      000_Eclipse100/T/THERMAL
      000_Eclipse100/T/THPRES
+     000_Eclipse100/T/THPRESFT
      000_Eclipse100/T/TITLE
      000_Eclipse100/T/TLMIXPAR
      000_Eclipse100/T/TNUM
@@ -376,6 +389,7 @@ set( keywords
      000_Eclipse100/W/WEFAC
      000_Eclipse100/W/WELLDIMS
      000_Eclipse100/W/WELL_PROBE
+     000_Eclipse100/W/WELL_COMPLETION_PROBE
      000_Eclipse100/W/WELOPEN
      000_Eclipse100/W/WELPI
      000_Eclipse100/W/WELSEGS
@@ -389,6 +403,7 @@ set( keywords
      000_Eclipse100/W/WINJMULT
      000_Eclipse100/W/WLIFT
      000_Eclipse100/W/WLIMTOL
+     000_Eclipse100/W/WLIST
      000_Eclipse100/W/WORKLIM
      000_Eclipse100/W/WORKTHP
      000_Eclipse100/W/WPAVE
@@ -448,6 +463,7 @@ set( keywords
      001_Eclipse300/Z/ZFACTORS
      002_Frontsim/N/NOGRAV
 
+     900_OPM/B/BC
      900_OPM/G/GCOMPIDX
      900_OPM/G/GRUPRIG
      900_OPM/G/GASDENT

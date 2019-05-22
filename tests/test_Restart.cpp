@@ -34,7 +34,7 @@
 #include <opm/parser/eclipse/EclipseState/IOConfig/IOConfig.hpp>
 #include <opm/parser/eclipse/EclipseState/Schedule/Schedule.hpp>
 #include <opm/parser/eclipse/EclipseState/SummaryConfig/SummaryConfig.hpp>
-#include <opm/parser/eclipse/EclipseState/Schedule/Well.hpp>
+#include <opm/parser/eclipse/EclipseState/Schedule/Well/Well.hpp>
 #include <opm/parser/eclipse/Parser/Parser.hpp>
 #include <opm/parser/eclipse/Utility/Functional.hpp>
 #include <opm/parser/eclipse/EclipseState/Schedule/SummaryState.hpp>
@@ -351,59 +351,118 @@ Opm::SummaryState sim_state()
 {
     auto state = Opm::SummaryState{};
 
-    state.add("WOPR:OP_1" ,    1.0);
-    state.add("WWPR:OP_1" ,    2.0);
-    state.add("WGPR:OP_1" ,    3.0);
-    state.add("WVPR:OP_1" ,    4.0);
-    state.add("WOPT:OP_1" ,   10.0);
-    state.add("WWPT:OP_1" ,   20.0);
-    state.add("WGPT:OP_1" ,   30.0);
-    state.add("WVPT:OP_1" ,   40.0);
-    state.add("WWIR:OP_1" ,    0.0);
-    state.add("WGIR:OP_1" ,    0.0);
-    state.add("WWIT:OP_1" ,    0.0);
-    state.add("WGIT:OP_1" ,    0.0);
-    state.add("WWCT:OP_1" ,    0.625);
-    state.add("WGOR:OP_1" ,  234.5);
-    state.add("WBHP:OP_1" ,  314.15);
-    state.add("WGVIR:OP_1",    0.0);
-    state.add("WWVIR:OP_1",    0.0);
+    state.update("WOPR:OP_1" ,    1.0);
+    state.update("WWPR:OP_1" ,    2.0);
+    state.update("WGPR:OP_1" ,    3.0);
+    state.update("WVPR:OP_1" ,    4.0);
+    state.update("WOPT:OP_1" ,   10.0);
+    state.update("WWPT:OP_1" ,   20.0);
+    state.update("WGPT:OP_1" ,   30.0);
+    state.update("WVPT:OP_1" ,   40.0);
+    state.update("WWIR:OP_1" ,    0.0);
+    state.update("WGIR:OP_1" ,    0.0);
+    state.update("WWIT:OP_1" ,    0.0);
+    state.update("WGIT:OP_1" ,    0.0);
+    state.update("WWCT:OP_1" ,    0.625);
+    state.update("WGOR:OP_1" ,  234.5);
+    state.update("WBHP:OP_1" ,  314.15);
+    state.update("WOPTH:OP_1",  345.6);
+    state.update("WWPTH:OP_1",  456.7);
+    state.update("WGPTH:OP_1",  567.8);
+    state.update("WWITH:OP_1",    0.0);
+    state.update("WGITH:OP_1",    0.0);
+    state.update("WGVIR:OP_1",    0.0);
+    state.update("WWVIR:OP_1",    0.0);
 
-    state.add("WOPR:OP_2" ,    0.0);
-    state.add("WWPR:OP_2" ,    0.0);
-    state.add("WGPR:OP_2" ,    0.0);
-    state.add("WVPR:OP_2" ,    0.0);
-    state.add("WOPT:OP_2" ,    0.0);
-    state.add("WWPT:OP_2" ,    0.0);
-    state.add("WGPT:OP_2" ,    0.0);
-    state.add("WVPT:OP_2" ,    0.0);
-    state.add("WWIR:OP_2" ,  100.0);
-    state.add("WGIR:OP_2" ,  200.0);
-    state.add("WWIT:OP_2" , 1000.0);
-    state.add("WGIT:OP_2" , 2000.0);
-    state.add("WWCT:OP_2" ,    0.0);
-    state.add("WGOR:OP_2" ,    0.0);
-    state.add("WBHP:OP_2" ,  400.6);
-    state.add("WGVIR:OP_2", 1234.0);
-    state.add("WWVIR:OP_2", 4321.0);
+    state.update("WOPR:OP_2" ,    0.0);
+    state.update("WWPR:OP_2" ,    0.0);
+    state.update("WGPR:OP_2" ,    0.0);
+    state.update("WVPR:OP_2" ,    0.0);
+    state.update("WOPT:OP_2" ,    0.0);
+    state.update("WWPT:OP_2" ,    0.0);
+    state.update("WGPT:OP_2" ,    0.0);
+    state.update("WVPT:OP_2" ,    0.0);
+    state.update("WWIR:OP_2" ,  100.0);
+    state.update("WGIR:OP_2" ,  200.0);
+    state.update("WWIT:OP_2" , 1000.0);
+    state.update("WGIT:OP_2" , 2000.0);
+    state.update("WWCT:OP_2" ,    0.0);
+    state.update("WGOR:OP_2" ,    0.0);
+    state.update("WBHP:OP_2" ,  400.6);
+    state.update("WOPTH:OP_2",    0.0);
+    state.update("WWPTH:OP_2",    0.0);
+    state.update("WGPTH:OP_2",    0.0);
+    state.update("WWITH:OP_2", 1515.0);
+    state.update("WGITH:OP_2", 3030.0);
+    state.update("WGVIR:OP_2", 1234.0);
+    state.update("WWVIR:OP_2", 4321.0);
 
-    state.add("WOPR:OP_3" ,   11.0);
-    state.add("WWPR:OP_3" ,   12.0);
-    state.add("WGPR:OP_3" ,   13.0);
-    state.add("WVPR:OP_3" ,   14.0);
-    state.add("WOPT:OP_3" ,  110.0);
-    state.add("WWPT:OP_3" ,  120.0);
-    state.add("WGPT:OP_3" ,  130.0);
-    state.add("WVPT:OP_3" ,  140.0);
-    state.add("WWIR:OP_3" ,    0.0);
-    state.add("WGIR:OP_3" ,    0.0);
-    state.add("WWIT:OP_3" ,    0.0);
-    state.add("WGIT:OP_3" ,    0.0);
-    state.add("WWCT:OP_3" ,    0.0625);
-    state.add("WGOR:OP_3" , 1234.5);
-    state.add("WBHP:OP_3" ,  314.15);
-    state.add("WGVIR:OP_3",    0.0);
-    state.add("WWVIR:OP_3",   43.21);
+    state.update("WOPR:OP_3" ,   11.0);
+    state.update("WWPR:OP_3" ,   12.0);
+    state.update("WGPR:OP_3" ,   13.0);
+    state.update("WVPR:OP_3" ,   14.0);
+    state.update("WOPT:OP_3" ,  110.0);
+    state.update("WWPT:OP_3" ,  120.0);
+    state.update("WGPT:OP_3" ,  130.0);
+    state.update("WVPT:OP_3" ,  140.0);
+    state.update("WWIR:OP_3" ,    0.0);
+    state.update("WGIR:OP_3" ,    0.0);
+    state.update("WWIT:OP_3" ,    0.0);
+    state.update("WGIT:OP_3" ,    0.0);
+    state.update("WWCT:OP_3" ,    0.0625);
+    state.update("WGOR:OP_3" , 1234.5);
+    state.update("WBHP:OP_3" ,  314.15);
+    state.update("WOPTH:OP_3", 2345.6);
+    state.update("WWPTH:OP_3", 3456.7);
+    state.update("WGPTH:OP_3", 4567.8);
+    state.update("WWITH:OP_3",    0.0);
+    state.update("WGITH:OP_3",    0.0);
+    state.update("WGVIR:OP_3",    0.0);
+    state.update("WWVIR:OP_3",   43.21);
+
+    state.update("GOPR:OP" ,     110.0);
+    state.update("GWPR:OP" ,     120.0);
+    state.update("GGPR:OP" ,     130.0);
+    state.update("GVPR:OP" ,     140.0);
+    state.update("GOPT:OP" ,    1100.0);
+    state.update("GWPT:OP" ,    1200.0);
+    state.update("GGPT:OP" ,    1300.0);
+    state.update("GVPT:OP" ,    1400.0);
+    state.update("GWIR:OP" , -   256.0);
+    state.update("GGIR:OP" , - 65536.0);
+    state.update("GWIT:OP" ,   31415.9);
+    state.update("GGIT:OP" ,   27182.8);
+    state.update("GWCT:OP" ,       0.625);
+    state.update("GGOR:OP" ,    1234.5);
+    state.update("GGVIR:OP",     123.45);
+    state.update("GWVIR:OP",    1234.56);
+    state.update("GOPTH:OP",    5678.90);
+    state.update("GWPTH:OP",    6789.01);
+    state.update("GGPTH:OP",    7890.12);
+    state.update("GWITH:OP",    8901.23);
+    state.update("GGITH:OP",    9012.34);
+
+    state.update("FOPR" ,     1100.0);
+    state.update("FWPR" ,     1200.0);
+    state.update("FGPR" ,     1300.0);
+    state.update("FVPR" ,     1400.0);
+    state.update("FOPT" ,    11000.0);
+    state.update("FWPT" ,    12000.0);
+    state.update("FGPT" ,    13000.0);
+    state.update("FVPT" ,    14000.0);
+    state.update("FWIR" , -   2560.0);
+    state.update("FGIR" , - 655360.0);
+    state.update("FWIT" ,   314159.2);
+    state.update("FGIT" ,   271828.1);
+    state.update("FWCT" ,        0.625);
+    state.update("FGOR" ,     1234.5);
+    state.update("FOPTH",    56789.01);
+    state.update("FWPTH",    67890.12);
+    state.update("FGPTH",    78901.23);
+    state.update("FWITH",    89012.34);
+    state.update("FGITH",    90123.45);
+    state.update("FGVIR",     1234.56);
+    state.update("FWVIR",    12345.67);
 
     return state;
 }
@@ -688,7 +747,7 @@ BOOST_AUTO_TEST_CASE(ExtraData_content) {
                     /* extra_keys = */ {
                         {"EXTRA" , UnitSystem::measure::pressure, true}  ,
                         {"EXTRA2", UnitSystem::measure::identity, false}
-                    });
+                    }).first;
 
                 BOOST_CHECK(!rst_value.hasExtra("EXTRA2"));
                 BOOST_CHECK( rst_value.hasExtra("EXTRA"));
@@ -775,6 +834,138 @@ BOOST_AUTO_TEST_CASE(STORE_THPRES) {
     test_work_area_free(test_area);
 }
 
+
+
+BOOST_AUTO_TEST_CASE(Restore_Cumulatives)
+{
+    Setup setup("FIRST_SIM.DATA");
+
+    // Write fully ECLIPSE compatible output.  This also saves cumulatives.
+    setup.es.getIOConfig().setEclCompatibleRST(true);
+
+    const auto restart_value = RestartValue {
+        mkSolution(setup.grid.getNumActive()),
+        mkWells()
+    };
+    const auto sumState = sim_state();
+
+    RestartIO::save("FILE.UNRST", 1, 100, restart_value,
+                    setup.es, setup.grid, setup.schedule, sumState);
+
+    const auto rst_value = RestartIO::load("FILE.UNRST", 1,
+        /* solution_keys = */ {
+            RestartKey("SWAT", UnitSystem::measure::identity),
+        },
+        setup.es, setup.grid, setup.schedule,
+        /* extra_keys = */ {});
+
+    const auto& rstSumState = rst_value.second;
+
+    // Verify that the restored summary state has all of its requisite
+    // cumulative summary vectors.
+
+    // Producer => W*IT{,H} saved/restored as zero (0.0)
+    BOOST_CHECK(rstSumState.has("WOPT:OP_1"));
+    BOOST_CHECK(rstSumState.has("WGPT:OP_1"));
+    BOOST_CHECK(rstSumState.has("WWPT:OP_1"));
+    BOOST_CHECK(rstSumState.has("WVPT:OP_1"));
+    BOOST_CHECK(rstSumState.has("WWIT:OP_1"));
+    BOOST_CHECK(rstSumState.has("WGIT:OP_1"));
+    BOOST_CHECK(rstSumState.has("WOPTH:OP_1"));
+    BOOST_CHECK(rstSumState.has("WGPTH:OP_1"));
+    BOOST_CHECK(rstSumState.has("WWPTH:OP_1"));
+    BOOST_CHECK(rstSumState.has("WWITH:OP_1"));
+    BOOST_CHECK(rstSumState.has("WGITH:OP_1"));
+
+    BOOST_CHECK_CLOSE(rstSumState.get("WOPT:OP_1"), 10.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(rstSumState.get("WGPT:OP_1"), 30.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(rstSumState.get("WWPT:OP_1"), 20.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(rstSumState.get("WVPT:OP_1"), 40.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(rstSumState.get("WWIT:OP_1"),  0.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(rstSumState.get("WGIT:OP_1"),  0.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(rstSumState.get("WOPTH:OP_1"), 345.6, 1.0e-10);
+    BOOST_CHECK_CLOSE(rstSumState.get("WWPTH:OP_1"), 456.7, 1.0e-10);
+    BOOST_CHECK_CLOSE(rstSumState.get("WGPTH:OP_1"), 567.8, 1.0e-10);
+    BOOST_CHECK_CLOSE(rstSumState.get("WWITH:OP_1"),   0.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(rstSumState.get("WGITH:OP_1"),   0.0, 1.0e-10);
+
+    // Gas injector => W*PT{,H} saved/restored as zero (0.0)
+    BOOST_CHECK(rstSumState.has("WOPT:OP_2"));
+    BOOST_CHECK(rstSumState.has("WGPT:OP_2"));
+    BOOST_CHECK(rstSumState.has("WWPT:OP_2"));
+    BOOST_CHECK(rstSumState.has("WVPT:OP_2"));
+    BOOST_CHECK(rstSumState.has("WWIT:OP_2"));
+    BOOST_CHECK(rstSumState.has("WGIT:OP_2"));
+    BOOST_CHECK(rstSumState.has("WOPTH:OP_2"));
+    BOOST_CHECK(rstSumState.has("WGPTH:OP_2"));
+    BOOST_CHECK(rstSumState.has("WWPTH:OP_2"));
+    BOOST_CHECK(rstSumState.has("WWITH:OP_2"));
+    BOOST_CHECK(rstSumState.has("WGITH:OP_2"));
+
+    BOOST_CHECK_CLOSE(rstSumState.get("WOPT:OP_2"),    0.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(rstSumState.get("WGPT:OP_2"),    0.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(rstSumState.get("WWPT:OP_2"),    0.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(rstSumState.get("WVPT:OP_2"),    0.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(rstSumState.get("WWIT:OP_2"), 1000.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(rstSumState.get("WGIT:OP_2"), 2000.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(rstSumState.get("WOPTH:OP_2"),    0.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(rstSumState.get("WGPTH:OP_2"),    0.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(rstSumState.get("WWPTH:OP_2"),    0.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(rstSumState.get("WWITH:OP_2"), 1515.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(rstSumState.get("WGITH:OP_2"), 3030.0, 1.0e-10);
+
+    // Group cumulatives saved/restored for all phases
+    BOOST_CHECK(rstSumState.has("GOPT:OP"));
+    BOOST_CHECK(rstSumState.has("GGPT:OP"));
+    BOOST_CHECK(rstSumState.has("GWPT:OP"));
+    BOOST_CHECK(rstSumState.has("GVPT:OP"));
+    BOOST_CHECK(rstSumState.has("GWIT:OP"));
+    BOOST_CHECK(rstSumState.has("GGIT:OP"));
+    BOOST_CHECK(rstSumState.has("GOPTH:OP"));
+    BOOST_CHECK(rstSumState.has("GGPTH:OP"));
+    BOOST_CHECK(rstSumState.has("GWPTH:OP"));
+    BOOST_CHECK(rstSumState.has("GWITH:OP"));
+    BOOST_CHECK(rstSumState.has("GGITH:OP"));
+
+    BOOST_CHECK_CLOSE(rstSumState.get("GOPT:OP"),  1100.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(rstSumState.get("GWPT:OP"),  1200.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(rstSumState.get("GGPT:OP"),  1300.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(rstSumState.get("GVPT:OP"),  1400.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(rstSumState.get("GWIT:OP"), 31415.9, 1.0e-10);
+    BOOST_CHECK_CLOSE(rstSumState.get("GGIT:OP"), 27182.8, 1.0e-10);
+
+    BOOST_CHECK_CLOSE(rstSumState.get("GOPTH:OP"), 5678.90, 1.0e-10);
+    BOOST_CHECK_CLOSE(rstSumState.get("GGPTH:OP"), 7890.12, 1.0e-10);
+    BOOST_CHECK_CLOSE(rstSumState.get("GWPTH:OP"), 6789.01, 1.0e-10);
+    BOOST_CHECK_CLOSE(rstSumState.get("GWITH:OP"), 8901.23, 1.0e-10);
+    BOOST_CHECK_CLOSE(rstSumState.get("GGITH:OP"), 9012.34, 1.0e-10);
+
+    // Field cumulatives saved/restored for all phases
+    BOOST_CHECK(rstSumState.has("FOPT"));
+    BOOST_CHECK(rstSumState.has("FGPT"));
+    BOOST_CHECK(rstSumState.has("FWPT"));
+    BOOST_CHECK(rstSumState.has("FVPT"));
+    BOOST_CHECK(rstSumState.has("FWIT"));
+    BOOST_CHECK(rstSumState.has("FGIT"));
+    BOOST_CHECK(rstSumState.has("FOPTH"));
+    BOOST_CHECK(rstSumState.has("FGPTH"));
+    BOOST_CHECK(rstSumState.has("FWPTH"));
+    BOOST_CHECK(rstSumState.has("FWITH"));
+    BOOST_CHECK(rstSumState.has("FGITH"));
+
+    BOOST_CHECK_CLOSE(rstSumState.get("FOPT"),  11000.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(rstSumState.get("FWPT"),  12000.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(rstSumState.get("FGPT"),  13000.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(rstSumState.get("FVPT"),  14000.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(rstSumState.get("FWIT"), 314159.2, 1.0e-10);
+    BOOST_CHECK_CLOSE(rstSumState.get("FGIT"), 271828.1, 1.0e-10);
+
+    BOOST_CHECK_CLOSE(rstSumState.get("FOPTH"), 56789.01, 1.0e-10);
+    BOOST_CHECK_CLOSE(rstSumState.get("FGPTH"), 78901.23, 1.0e-10);
+    BOOST_CHECK_CLOSE(rstSumState.get("FWPTH"), 67890.12, 1.0e-10);
+    BOOST_CHECK_CLOSE(rstSumState.get("FWITH"), 89012.34, 1.0e-10);
+    BOOST_CHECK_CLOSE(rstSumState.get("FGITH"), 90123.45, 1.0e-10);
+}
 
 
 }

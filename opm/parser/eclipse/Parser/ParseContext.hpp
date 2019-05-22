@@ -107,9 +107,9 @@ namespace Opm {
         */
       void addKey(const std::string& key, InputError::Action default_action);
         /*
-          The PARSE_EXTRA_RECORDS field regulates how the parser 
-          responds to keywords whose size has been defined in the 
-          previous keyword. 
+          The PARSE_EXTRA_RECORDS field regulates how the parser
+          responds to keywords whose size has been defined in the
+          previous keyword.
           Example:
           EQLDIMS
             2  100  20  1  1  /
@@ -117,11 +117,11 @@ namespace Opm {
            2469   382.4   1705.0  0.0    500    0.0     1     1      20 /
            2469   382.4   1705.0  0.0    500    0.0     1     1      20 /
            2470   382.4   1705.0  0.0    500    0.0     1     1      20 /
-          EQLDIMS's first entry is 2 and defines the record size of the 
-          EQUIL keyword. Since there are 3 records in EQUIL, this results 
-          in an error that needs to be handled by the parser. By default, 
-          an exception is thrown, or it may be specified in the 
-          PARSE_EXTRA_RECORDS field that this error is to be ignored. 
+          EQLDIMS's first entry is 2 and defines the record size of the
+          EQUIL keyword. Since there are 3 records in EQUIL, this results
+          in an error that needs to be handled by the parser. By default,
+          an exception is thrown, or it may be specified in the
+          PARSE_EXTRA_RECORDS field that this error is to be ignored.
         */
         const static std::string PARSE_EXTRA_RECORDS;
         /*
@@ -194,6 +194,34 @@ namespace Opm {
         */
         const static std::string PARSE_MISSING_INCLUDE;
 
+        /// Dynamic number of wells exceeds maximum declared in
+        /// RUNSPEC keyword WELLDIMS (item 1).
+        const static std::string RUNSPEC_NUMWELLS_TOO_LARGE;
+
+        /// Dynamic number of connections per well exceeds maximum
+        /// declared in RUNSPEC keyword WELLDIMS (item 2).
+        const static std::string RUNSPEC_CONNS_PER_WELL_TOO_LARGE;
+
+        /// Dynamic number of groups exceeds maximum number declared in
+        /// RUNSPEC keyword WELLDIMS (item 3).
+        const static std::string RUNSPEC_NUMGROUPS_TOO_LARGE;
+
+        /// Dynamic group size exceeds maximum number declared in
+        /// RUNSPEC keyword WELLDIMS (item 4).
+        const static std::string RUNSPEC_GROUPSIZE_TOO_LARGE;
+
+        /*
+          Should we allow keywords of length more than eight characters? If the
+          keyword is too long it will be internalized using only the eight first
+          characters.
+        */
+        const static std::string PARSE_LONG_KEYWORD;
+
+        /*
+          The unit system specified via the FILEUNIT keyword is different from the unit
+          system used by the deck.
+        */
+        const static std::string UNIT_SYSTEM_MISMATCH;
 
         /*
           Some property modfiers can be modified in the Schedule
@@ -225,6 +253,7 @@ namespace Opm {
         */
         const static std::string UNSUPPORTED_TERMINATE_IF_BHP;
 
+        const static std::string UDQ_PARSE_ERROR;
 
         /*
           If the third item in the THPRES keyword is defaulted the
@@ -249,6 +278,8 @@ namespace Opm {
         const static std::string SUMMARY_UNKNOWN_WELL;
         const static std::string SUMMARY_UNKNOWN_GROUP;
         const static std::string SUMMARY_UNHANDLED_KEYWORD;
+        const static std::string SUMMARY_UNDEFINED_UDQ;
+        const static std::string SUMMARY_UDQ_MISSING_UNIT;
 
         /*
           A well must be specified (e.g. WELSPECS) and have completions
@@ -300,6 +331,16 @@ namespace Opm {
 
         const static std::string RPT_UNKNOWN_MNEMONIC;
 
+        const static std::string SCHEDULE_WELL_ERROR;
+
+        /*
+          The SIMULATOR_KEYWORD_ errormodes are for the situation where the
+          parser recognizes, and correctly parses a keyword, but we know that
+          the simulator does not support the intended use of the keyword. These
+          errormodes are invoked from the simulator.
+        */
+        const static std::string SIMULATOR_KEYWORD_NOT_SUPPORTED;
+        const static std::string SIMULATOR_KEYWORD_ITEM_NOT_SUPPORTED;
 
     private:
         void initDefault();

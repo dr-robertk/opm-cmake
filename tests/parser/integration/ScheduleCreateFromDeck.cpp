@@ -31,9 +31,9 @@
 #include <opm/parser/eclipse/EclipseState/Schedule/TimeMap.hpp>
 #include <opm/parser/eclipse/EclipseState/Schedule/Group.hpp>
 #include <opm/parser/eclipse/EclipseState/Schedule/GroupTree.hpp>
-#include <opm/parser/eclipse/EclipseState/Schedule/Well.hpp>
 #include <opm/parser/eclipse/EclipseState/Schedule/ScheduleEnums.hpp>
-#include <opm/parser/eclipse/EclipseState/Schedule/WellConnections.hpp>
+#include <opm/parser/eclipse/EclipseState/Schedule/Well/Well.hpp>
+#include <opm/parser/eclipse/EclipseState/Schedule/Well/WellConnections.hpp>
 #include <opm/parser/eclipse/EclipseState/Schedule/Events.hpp>
 #include <opm/parser/eclipse/Units/Units.hpp>
 
@@ -205,15 +205,17 @@ BOOST_AUTO_TEST_CASE(WellTesting) {
 
     {
         auto* well2 = sched.getWell("W_2");
+        const auto& rft_config = sched.rftConfig();
         BOOST_CHECK_EQUAL( 0 , well2->getProductionPropertiesCopy(2).ResVRate);
         BOOST_CHECK_CLOSE( 777/Metric::Time , well2->getProductionPropertiesCopy(7).ResVRate , 0.0001);
         BOOST_CHECK_EQUAL( 0 , well2->getProductionPropertiesCopy(8).ResVRate);
 
         BOOST_CHECK_EQUAL( WellCommon::SHUT , well2->getStatus(3));
-        BOOST_CHECK( !well2->getRFTActive( 2 ) );
-        BOOST_CHECK( well2->getRFTActive( 3 ) );
-        BOOST_CHECK( well2->getRFTActive( 4 ) );
-        BOOST_CHECK( !well2->getRFTActive( 5 ) );
+
+        BOOST_CHECK( !rft_config.rft("W_2", 2));
+        BOOST_CHECK( rft_config.rft("W_2", 3));
+        BOOST_CHECK( rft_config.rft("W_2", 4));
+        BOOST_CHECK( !rft_config.rft("W_2", 5));
         {
             const WellProductionProperties& prop3 = well2->getProductionProperties(3);
             BOOST_CHECK_EQUAL( WellProducer::ORAT , prop3.controlMode);
@@ -243,9 +245,9 @@ BOOST_AUTO_TEST_CASE(WellTesting) {
 
     {
         auto* well1 = sched.getWell("W_1");
+        const auto& rft_config = sched.rftConfig();
 
-        BOOST_CHECK_EQUAL( well1->firstRFTOutput( ) , 3);
-        BOOST_CHECK( well1->getRFTActive( 3 ) );
+        BOOST_CHECK(rft_config.rft("W_1", 3));
         BOOST_CHECK(well1->getProductionPropertiesCopy(0).predictionMode);
         BOOST_CHECK_EQUAL(0, well1->getProductionPropertiesCopy(0).OilRate);
 
@@ -318,7 +320,7 @@ BOOST_AUTO_TEST_CASE(WellTestCOMPDAT_DEFAULTED_ITEMS) {
     Parser parser;
     std::string scheduleFile(pathprefix() + "SCHEDULE/SCHEDULE_COMPDAT1");
     auto deck =  parser.parseFile(scheduleFile);
-    EclipseGrid grid(40,60,30);
+    EclipseGrid grid(10,10,10);
     TableManager table ( deck );
     Eclipse3DProperties eclipseProperties ( deck , table, grid);
     Runspec runspec (deck);
@@ -648,6 +650,13 @@ START\n\
 \n\
 10 MAI 2007 /\n\
 \n\
+GRID\n\
+PERMX\n\
+   9000*0.25 /\n\
+COPY \n\
+   PERMX PERMY /\n\
+   PERMX PERMZ /\n\
+/\n\
 SCHEDULE\n\
 WELSPECS \n\
      'W1'        'OP'   11   21  3.33       'OIL'  7* /   \n\
@@ -676,7 +685,7 @@ BOOST_AUTO_TEST_CASE(OpmCode) {
     Parser parser;
     std::string scheduleFile(pathprefix() + "SCHEDULE/wells_group.data");
     auto deck =  parser.parseFile(scheduleFile);
-    EclipseGrid grid(10,10,3);
+    EclipseGrid grid(10,10,5);
     TableManager table ( deck );
     Eclipse3DProperties eclipseProperties ( deck , table, grid);
     Runspec runspec (deck);
@@ -920,20 +929,19 @@ BOOST_AUTO_TEST_CASE(TestWellEvents) {
     const auto& w2 = sched.getWell( "W_2");
 
 
-    BOOST_CHECK( w1->hasEvent( ScheduleEvents::NEW_WELL , 0 ));
-    BOOST_CHECK( w2->hasEvent( ScheduleEvents::NEW_WELL , 2 ));
-    BOOST_CHECK( !w2->hasEvent( ScheduleEvents::NEW_WELL , 3 ));
-    BOOST_CHECK( w2->hasEvent( ScheduleEvents::WELL_WELSPECS_UPDATE , 3 ));
+    BOOST_CHECK( sched.hasWellEvent( "W_1", ScheduleEvents::NEW_WELL , 0 ));
+    BOOST_CHECK( sched.hasWellEvent( "W_2", ScheduleEvents::NEW_WELL , 2 ));
+    BOOST_CHECK( !sched.hasWellEvent( "W_2", ScheduleEvents::NEW_WELL , 3 ));
+    BOOST_CHECK( sched.hasWellEvent( "W_2", ScheduleEvents::WELL_WELSPECS_UPDATE , 3 ));
 
+    BOOST_CHECK( sched.hasWellEvent( "W_1", ScheduleEvents::WELL_STATUS_CHANGE , 0 ));
+    BOOST_CHECK( sched.hasWellEvent( "W_1", ScheduleEvents::WELL_STATUS_CHANGE , 1 ));
+    BOOST_CHECK( sched.hasWellEvent( "W_1", ScheduleEvents::WELL_STATUS_CHANGE , 3 ));
+    BOOST_CHECK( sched.hasWellEvent( "W_1", ScheduleEvents::WELL_STATUS_CHANGE , 4 ));
+    BOOST_CHECK( !sched.hasWellEvent( "W_1", ScheduleEvents::WELL_STATUS_CHANGE , 5 ));
 
-    BOOST_CHECK( w1->hasEvent( ScheduleEvents::WELL_STATUS_CHANGE , 0 ));
-    BOOST_CHECK( w1->hasEvent( ScheduleEvents::WELL_STATUS_CHANGE , 1 ));
-    BOOST_CHECK( w1->hasEvent( ScheduleEvents::WELL_STATUS_CHANGE , 3 ));
-    BOOST_CHECK( w1->hasEvent( ScheduleEvents::WELL_STATUS_CHANGE , 4 ));
-    BOOST_CHECK( !w1->hasEvent( ScheduleEvents::WELL_STATUS_CHANGE , 5 ));
-
-    BOOST_CHECK( w1->hasEvent( ScheduleEvents::COMPLETION_CHANGE , 0 ));
-    BOOST_CHECK( w1->hasEvent( ScheduleEvents::COMPLETION_CHANGE , 5 ));
+    BOOST_CHECK( sched.hasWellEvent( "W_1", ScheduleEvents::COMPLETION_CHANGE , 0 ));
+    BOOST_CHECK( sched.hasWellEvent( "W_1", ScheduleEvents::COMPLETION_CHANGE , 5 ));
 
     BOOST_CHECK_EQUAL( w1->firstTimeStep( ) , 0 );
     BOOST_CHECK_EQUAL( w2->firstTimeStep( ) , 2 );

@@ -48,6 +48,12 @@ static Deck createDeck_no_wells( const std::string& summary ) {
             "DYV \n 10*400 /\n"
             "DZV \n 10*400 /\n"
             "TOPS \n 100*2202 / \n"
+            "PERMX\n"
+            "  1000*0.25 /\n"
+            "COPY\n"
+            "  PERMX PERMY /\n"
+            "  PERMX PERMZ /\n"
+            "/\n"
             "REGIONS\n"
             "FIPNUM\n"
             "200*1 300*2 500*3 /\n"
@@ -75,6 +81,12 @@ static Deck createDeck( const std::string& summary ) {
             "DYV \n 10*400 /\n"
             "DZV \n 10*400 /\n"
             "TOPS \n 100*2202 / \n"
+            "PERMX\n"
+            "  1000*0.25 /\n"
+            "COPY\n"
+            "  PERMX PERMY /\n"
+            "  PERMX PERMZ /\n"
+            "/\n"
             "REGIONS\n"
             "FIPNUM\n"
             "200*1 300*2 500*3 /\n"
@@ -148,6 +160,14 @@ BOOST_AUTO_TEST_CASE(wells_all) {
             names.begin(), names.end() );
 }
 
+BOOST_AUTO_TEST_CASE(EMPTY) {
+    auto deck = createDeck_no_wells( "" );
+    EclipseState state( deck );
+    Schedule schedule(deck, state.getInputGrid(), state.get3DProperties(), state.runspec());
+    SummaryConfig conf(deck, schedule, state.getTableManager());
+    BOOST_CHECK_EQUAL( conf.size(), 0 );
+}
+
 BOOST_AUTO_TEST_CASE(wells_missingI) {
     ParseContext parseContext;
     ErrorGuard errors;
@@ -169,6 +189,8 @@ BOOST_AUTO_TEST_CASE(wells_select) {
     BOOST_CHECK_EQUAL_COLLECTIONS(
             wells.begin(), wells.end(),
             names.begin(), names.end() );
+
+    BOOST_CHECK_EQUAL( summary.size(), 2 );
 }
 
 BOOST_AUTO_TEST_CASE(groups_all) {
@@ -351,14 +373,16 @@ static const auto ALL_keywords = {
     "FGIR",  "FGIT",  "FGOR", "FGPR",  "FGPT", "FOIP",  "FOIPG",
     "FOIPL", "FOIR",  "FOIT", "FOPR",  "FOPT", "FPR",   "FVIR",
     "FVIT",  "FVPR",  "FVPT", "FWCT",  "FWGR", "FWIP",  "FWIR",
-    "FWIT",  "FWPR",  "FWPT",
+    "FWIT",  "FWPR",  "FWPT", "FWPP",  "FOPP", "FGPP",  "FWPI",
+    "FOPI",  "FGPI",
     "GGIR",  "GGIT",  "GGOR", "GGPR",  "GGPT", "GOIR",  "GOIT",
     "GOPR",  "GOPT",  "GVIR", "GVIT",  "GVPR", "GVPT",  "GWCT",
-    "GWGR",  "GWIR",  "GWIT", "GWPR",  "GWPT",
+    "GWGR",  "GWIR",  "GWIT", "GWPR",  "GWPT", "GWPP",  "GOPP",
+    "GGPP",  "GWPI",  "GOPI", "GGPI",
     "WBHP",  "WGIR",  "WGIT", "WGOR",  "WGPR", "WGPT",  "WOIR",
     "WOIT",  "WOPR",  "WOPT", "WPI",   "WTHP", "WVIR",  "WVIT",
     "WVPR",  "WVPT",  "WWCT", "WWGR",  "WWIR", "WWIT",  "WWPR",
-    "WWPT",
+    "WWPT",  "WWPP",  "WOPP", "WGPP",  "WWPI", "WGPI",  "WOPI",
     // ALL will not expand to these keywords yet
     "AAQR",  "AAQRG", "AAQT", "AAQTG"
 };
@@ -429,6 +453,19 @@ BOOST_AUTO_TEST_CASE(INVALID_WELL2) {
     parseContext.updateKey( ParseContext::SUMMARY_UNKNOWN_WELL , InputError::IGNORE );
     BOOST_CHECK_NO_THROW( createSummary( input , parseContext ));
 }
+
+BOOST_AUTO_TEST_CASE(UNDEFINED_UDQ_WELL) {
+    ParseContext parseContext;
+    const auto input = "WUWCT\n"
+        "/\n";
+    parseContext.updateKey( ParseContext::SUMMARY_UNDEFINED_UDQ, InputError::THROW_EXCEPTION );
+    BOOST_CHECK_THROW( createSummary( input , parseContext ) , std::invalid_argument);
+
+    parseContext.updateKey( ParseContext::SUMMARY_UNDEFINED_UDQ, InputError::IGNORE );
+    BOOST_CHECK_NO_THROW( createSummary( input , parseContext ));
+}
+
+
 
 
 BOOST_AUTO_TEST_CASE(INVALID_GROUP) {
@@ -548,6 +585,24 @@ BOOST_AUTO_TEST_CASE( summary_FMWSET ) {
     BOOST_CHECK( summary.hasKeyword( "FMWPR" ) );
 
     BOOST_CHECK( !summary.hasKeyword("NO-NOT-THIS") );
+}
+
+
+
+BOOST_AUTO_TEST_CASE( WOPRL ) {
+    const std::string input = R"(
+WOPRL
+   'W_1'  1 /
+   'WX2'  2 /
+   'W_3'  3 /
+/
+)";
+
+    ParseContext parseContext;
+    parseContext.update(ParseContext::SUMMARY_UNHANDLED_KEYWORD, InputError::THROW_EXCEPTION);
+    BOOST_CHECK_THROW(createSummary( input, parseContext ), std::invalid_argument);
+    parseContext.update(ParseContext::SUMMARY_UNHANDLED_KEYWORD, InputError::IGNORE);
+    BOOST_CHECK_NO_THROW( createSummary(input, parseContext ));
 }
 
 

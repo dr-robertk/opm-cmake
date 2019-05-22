@@ -136,11 +136,27 @@ static data::Wells result_wells() {
     rates3.set( rt::productivity_index_water, -30.9 / day );
     rates3.set( rt::productivity_index_oil, -30.11 / day );
     rates3.set( rt::productivity_index_gas, -30.12 / day );
-    rates3.set( rt::well_potential_water, -30.13 / day );
-    rates3.set( rt::well_potential_oil, -30.14 / day );
-    rates3.set( rt::well_potential_gas, -30.15 / day );
+    rates3.set( rt::well_potential_water, 30.13 / day );
+    rates3.set( rt::well_potential_oil, 30.14 / day );
+    rates3.set( rt::well_potential_gas, 30.15 / day );
 
 
+    data::Rates rates6;
+    rates6.set( rt::wat, 60.0 / day );
+    rates6.set( rt::oil, 60.1 / day );
+    rates6.set( rt::gas, 60.2 / day );
+    rates6.set( rt::solvent, 60.3 / day );
+    rates6.set( rt::dissolved_gas, 60.4 / day );
+    rates6.set( rt::vaporized_oil, 60.5 / day );
+    rates6.set( rt::reservoir_water, 60.6 / day );
+    rates6.set( rt::reservoir_oil, 60.7 / day );
+    rates6.set( rt::reservoir_gas, 60.8 / day );
+    rates6.set( rt::productivity_index_water, -60.9 / day );
+    rates6.set( rt::productivity_index_oil, -60.11 / day );
+    rates6.set( rt::productivity_index_gas, -60.12 / day );
+    rates6.set( rt::well_potential_water, 60.13 / day );
+    rates6.set( rt::well_potential_oil, 60.14 / day );
+    rates6.set( rt::well_potential_gas, 60.15 / day );
     /* completion rates */
     data::Rates crates1;
     crates1.set( rt::wat, -100.0 / day );
@@ -175,6 +191,17 @@ static data::Wells result_wells() {
     crates3.set( rt::reservoir_oil, 300.7 / day );
     crates3.set( rt::reservoir_gas, 300.8 / day );
 
+    data::Rates crates6;
+    crates6.set( rt::wat, 600.0 / day );
+    crates6.set( rt::oil, 600.1 / day );
+    crates6.set( rt::gas, 600.2 / day );
+    crates6.set( rt::solvent, 600.3 / day );
+    crates6.set( rt::dissolved_gas, 600.4 / day );
+    crates6.set( rt::vaporized_oil, 600.5 / day );
+    crates6.set( rt::reservoir_water, 600.6 / day );
+    crates6.set( rt::reservoir_oil, 600.7 / day );
+    crates6.set( rt::reservoir_gas, 600.8 / day );
+
     // Segment vectors
     auto segment = ::Opm::data::Segment{};
     segment.rates.set(rt::wat,  123.45*sm3_pr_day());
@@ -192,8 +219,7 @@ static data::Wells result_wells() {
     data::Connection well2_comp1 { 1  , crates2, 1.10 , 123.4, 212.1, 0.78, 0.0, 12.34};
     data::Connection well2_comp2 { 101, crates3, 1.11 , 123.4, 150.6, 0.001, 0.89, 100.0};
     data::Connection well3_comp1 { 2  , crates3, 1.11 , 123.4, 456.78, 0.0, 0.15, 432.1};
-
-
+    data::Connection well6_comp1 { 5  , crates6, 6.11 , 623.4, 656.78, 0.0, 0.65, 632.1};
     /*
       The completions
     */
@@ -207,12 +233,14 @@ static data::Wells result_wells() {
 
     data::Well well2 { rates2, 1.1 * ps, 1.2 * ps, 1.3 * ps, 2, { {well2_comp1 , well2_comp2} }, SegRes{} };
     data::Well well3 { rates3, 2.1 * ps, 2.2 * ps, 2.3 * ps, 3, { {well3_comp1} }, SegRes{} };
+    data::Well well6 { rates6, 2.1 * ps, 2.2 * ps, 2.3 * ps, 3, { {well6_comp1} }, SegRes{} };
 
     data::Wells wellrates;
 
     wellrates["W_1"] = well1;
     wellrates["W_2"] = well2;
     wellrates["W_3"] = well3;
+    wellrates["W_6"] = well6;
 
     wellrates["INJE01"] = SegmentResultHelpers::inje01_results();
     wellrates["PROD01"] = SegmentResultHelpers::prod01_results();
@@ -238,7 +266,7 @@ struct setup {
 
     /*-----------------------------------------------------------------*/
 
-    setup( const std::string& fname , const char* path = "summary_deck.DATA") : 
+    setup( const std::string& fname , const char* path = "summary_deck.DATA") :
         deck( Parser().parseFile( path) ),
         es( deck ),
         grid( es.getInputGrid() ),
@@ -256,6 +284,20 @@ struct setup {
 
 };
 
+
+void compare(const SummaryState& st, const ecl_sum_type * ecl_sum, int tstep) {
+    for (const auto& key_value : st) {
+        const std::string& key = key_value.first;
+        double value = key_value.second;
+
+        if (ecl_sum_has_general_var(ecl_sum, key.c_str()))
+            // The ecl_sum value has been on disk where it has been stored as float
+            // - i.e. we must use BOOST_CHECK_CLOSE()
+            BOOST_CHECK_CLOSE(value, ecl_sum_get_general_var(ecl_sum, tstep, key.c_str()), 1e-5);
+    }
+}
+
+
 BOOST_AUTO_TEST_SUITE(Summary)
 
 /*
@@ -270,11 +312,29 @@ BOOST_AUTO_TEST_CASE(well_keywords) {
     util_make_path( "PATH" );
     cfg.name = "PATH/CASE";
 
+    SummaryState st0;
+    SummaryState st1;
+    SummaryState st2;
+
+    /*
+      The state of the summary object is modified in the add_timestep() routine,
+      therefor the eval and add_timestep() calls must be carefully interleaved -
+      the perils of state!
+    */
+
     out::Summary writer( cfg.es, cfg.config, cfg.grid, cfg.schedule , cfg.name );
+    writer.eval(st0, 0, 0*day, cfg.es, cfg.schedule, cfg.wells, {});
     writer.add_timestep( 0, 0 * day, cfg.es, cfg.schedule, cfg.wells , {});
+
+    writer.eval(st1, 1, 1*day, cfg.es, cfg.schedule, cfg.wells, {});
     writer.add_timestep( 1, 1 * day, cfg.es, cfg.schedule, cfg.wells , {});
+
+    writer.eval(st2, 2, 2*day, cfg.es, cfg.schedule, cfg.wells, {});
     writer.add_timestep( 2, 2 * day, cfg.es, cfg.schedule, cfg.wells , {});
     writer.write();
+
+
+
 
     auto res = readsum( cfg.name );
     const auto* resp = res.get();
@@ -310,6 +370,15 @@ BOOST_AUTO_TEST_CASE(well_keywords) {
     BOOST_CHECK_CLOSE( 20.5, ecl_sum_get_well_var( resp, 1, "W_2", "WOPRS" ), 1e-5 );
     BOOST_CHECK_CLOSE( (10.1 - 10.5), ecl_sum_get_well_var( resp, 1, "W_1", "WOPRF" ), 1e-5 );
     BOOST_CHECK_CLOSE( (20.1 - 20.5), ecl_sum_get_well_var( resp, 1, "W_2", "WOPRF" ), 1e-5 );
+
+    BOOST_CHECK_CLOSE( -10.13, ecl_sum_get_well_var( resp, 1, "W_1", "WWPP" ), 1e-5 );
+    BOOST_CHECK_CLOSE( -10.14, ecl_sum_get_well_var( resp, 1, "W_1", "WOPP" ), 1e-5 );
+    BOOST_CHECK_CLOSE( -10.15, ecl_sum_get_well_var( resp, 1, "W_1", "WGPP" ), 1e-5 );
+    BOOST_CHECK_CLOSE( -20.13, ecl_sum_get_well_var( resp, 1, "W_2", "WWPP" ), 1e-5 );
+    BOOST_CHECK_CLOSE( -20.14, ecl_sum_get_well_var( resp, 1, "W_2", "WOPP" ), 1e-5 );
+    BOOST_CHECK_CLOSE( -20.15, ecl_sum_get_well_var( resp, 1, "W_2", "WGPP" ), 1e-5 );
+    BOOST_CHECK_CLOSE(  30.13, ecl_sum_get_well_var( resp, 1, "W_3", "WWPI" ), 1e-5 );
+    BOOST_CHECK_CLOSE(  60.15, ecl_sum_get_well_var( resp, 1, "W_6", "WGPI" ), 1e-5 );
 
     /* Production totals */
     BOOST_CHECK_CLOSE( 10.0, ecl_sum_get_well_var( resp, 1, "W_1", "WWPT" ), 1e-5 );
@@ -462,6 +531,28 @@ BOOST_AUTO_TEST_CASE(well_keywords) {
     BOOST_CHECK_CLOSE( 0.2, ecl_sum_get_well_var( resp, 1, "W_1", "WTHPH" ), 1e-5 );
     BOOST_CHECK_CLOSE( 1.2, ecl_sum_get_well_var( resp, 1, "W_2", "WTHPH" ), 1e-5 );
     BOOST_CHECK_CLOSE( 2.2, ecl_sum_get_well_var( resp, 1, "W_3", "WTHPH" ), 1e-5 );
+
+    compare(st0, resp, 0);
+    compare(st1, resp, 1);
+    compare(st2, resp, 2);
+}
+
+BOOST_AUTO_TEST_CASE(udq_keywords) {
+    setup cfg( "test_summary_udq" );
+
+    out::Summary writer( cfg.es, cfg.config, cfg.grid, cfg.schedule , cfg.name );
+    writer.add_timestep( 0, 0 * day, cfg.es, cfg.schedule, cfg.wells , {});
+    writer.add_timestep( 1, 1 * day, cfg.es, cfg.schedule, cfg.wells , {});
+    writer.add_timestep( 2, 2 * day, cfg.es, cfg.schedule, cfg.wells , {});
+    writer.write();
+
+    auto res = readsum( cfg.name );
+    const auto* resp = res.get();
+
+    const auto& udq_params = cfg.es.runspec().udqParams();
+    BOOST_CHECK_CLOSE( ecl_sum_get_well_var(resp, 1, "W_1", "WUBHP"), udq_params.undefinedValue(), 1e-5 );
+    BOOST_CHECK_CLOSE( ecl_sum_get_well_var(resp, 1, "W_3", "WUBHP"), udq_params.undefinedValue(), 1e-5 );
+    BOOST_CHECK_EQUAL( std::string(ecl_sum_get_unit(resp, "WUBHP:W_1")), "BARSA");
 }
 
 BOOST_AUTO_TEST_CASE(group_keywords) {
@@ -489,6 +580,12 @@ BOOST_AUTO_TEST_CASE(group_keywords) {
                                     ecl_sum_get_group_var( resp, 1, "G_1", "GOPRF" ), 1e-5 );
     BOOST_CHECK_CLOSE( 10.6 + 10.7 + 10.8 + 20.6 + 20.7 + 20.8,
                                     ecl_sum_get_group_var( resp, 1, "G_1", "GVPR" ), 1e-5 );
+
+    BOOST_CHECK_CLOSE( -10.13 - 20.13, ecl_sum_get_group_var( resp, 1, "G_1", "GWPP" ), 1e-5 );
+    BOOST_CHECK_CLOSE( -10.14 - 20.14, ecl_sum_get_group_var( resp, 1, "G_1", "GOPP" ), 1e-5 );
+    BOOST_CHECK_CLOSE( -10.15 - 20.15, ecl_sum_get_group_var( resp, 1, "G_1", "GGPP" ), 1e-5 );
+    BOOST_CHECK_CLOSE(  30.13 + 60.13, ecl_sum_get_group_var( resp, 1, "G_2", "GWPI" ), 1e-5 );
+    BOOST_CHECK_CLOSE(  30.15 + 60.15, ecl_sum_get_group_var( resp, 1, "G_2", "GGPI" ), 1e-5 );
 
     /* Production totals */
     BOOST_CHECK_CLOSE( 10.0 + 20.0, ecl_sum_get_group_var( resp, 1, "G_1", "GWPT" ), 1e-5 );
@@ -534,33 +631,33 @@ BOOST_AUTO_TEST_CASE(group_keywords) {
     BOOST_CHECK_CLOSE( 30.1 , ecl_sum_get_group_var( resp, 1, "G_3", "GVPRT" ), 1e-5 );
 
     /* Injection rates */
-    BOOST_CHECK_CLOSE( 30.0, ecl_sum_get_group_var( resp, 1, "G_2", "GWIR" ), 1e-5 );
-    BOOST_CHECK_CLOSE( 30.2, ecl_sum_get_group_var( resp, 1, "G_2", "GGIR" ), 1e-5 );
-    BOOST_CHECK_CLOSE( 30.3, ecl_sum_get_group_var( resp, 1, "G_2", "GNIR" ), 1e-5 );
+    BOOST_CHECK_CLOSE( 30.0 + 60.0, ecl_sum_get_group_var( resp, 1, "G_2", "GWIR" ), 1e-5 );
+    BOOST_CHECK_CLOSE( 30.2 + 60.2, ecl_sum_get_group_var( resp, 1, "G_2", "GGIR" ), 1e-5 );
+    BOOST_CHECK_CLOSE( 30.3 + 60.3, ecl_sum_get_group_var( resp, 1, "G_2", "GNIR" ), 1e-5 );
     BOOST_CHECK_CLOSE( 30.0 * 1.5, ecl_sum_get_group_var( resp, 1, "G_2", "GCIR" ), 1e-5 );
     BOOST_CHECK_CLOSE( 30.0 * 2.5, ecl_sum_get_group_var( resp, 2, "G_2", "GCIR" ), 1e-5 );
-    BOOST_CHECK_CLOSE( (30.6 + 30.7 + 30.8),
+    BOOST_CHECK_CLOSE( (30.6 + 30.7 + 30.8 + 60.6 + 60.7 + 60.8),
                        ecl_sum_get_group_var( resp, 1, "G_2", "GVIR" ), 1e-5 );
 
     /* Injection totals */
-    BOOST_CHECK_CLOSE( 30.0, ecl_sum_get_group_var( resp, 1, "G_2", "GWIT" ), 1e-5 );
-    BOOST_CHECK_CLOSE( 30.2, ecl_sum_get_group_var( resp, 1, "G_2", "GGIT" ), 1e-5 );
-    BOOST_CHECK_CLOSE( 30.3, ecl_sum_get_group_var( resp, 1, "G_2", "GNIT" ), 1e-5 );
+    BOOST_CHECK_CLOSE( 30.0 + 60.0, ecl_sum_get_group_var( resp, 1, "G_2", "GWIT" ), 1e-5 );
+    BOOST_CHECK_CLOSE( 30.2 + 60.2, ecl_sum_get_group_var( resp, 1, "G_2", "GGIT" ), 1e-5 );
+    BOOST_CHECK_CLOSE( 30.3 + 60.3, ecl_sum_get_group_var( resp, 1, "G_2", "GNIT" ), 1e-5 );
     BOOST_CHECK_CLOSE( 30.0 * 1.5, ecl_sum_get_group_var( resp, 1, "G_2", "GCIT" ), 1e-5 );
-    BOOST_CHECK_CLOSE( (30.6 + 30.7 + 30.8),
+    BOOST_CHECK_CLOSE( (30.6 + 30.7 + 30.8 + 60.6 + 60.7 + 60.8),
                        ecl_sum_get_group_var( resp, 1, "G_2", "GVIT" ), 1e-5 );
-    BOOST_CHECK_CLOSE( 2 * 30.0, ecl_sum_get_group_var( resp, 2, "G_2", "GWIT" ), 1e-5 );
-    BOOST_CHECK_CLOSE( 2 * 30.2, ecl_sum_get_group_var( resp, 2, "G_2", "GGIT" ), 1e-5 );
-    BOOST_CHECK_CLOSE( 2 * 30.3, ecl_sum_get_group_var( resp, 2, "G_2", "GNIT" ), 1e-5 );
+    BOOST_CHECK_CLOSE( 2 * (30.0 + 60.0), ecl_sum_get_group_var( resp, 2, "G_2", "GWIT" ), 1e-5 );
+    BOOST_CHECK_CLOSE( 2 * (30.2 + 60.2), ecl_sum_get_group_var( resp, 2, "G_2", "GGIT" ), 1e-5 );
+    BOOST_CHECK_CLOSE( 2 * (30.3 + 60.3), ecl_sum_get_group_var( resp, 2, "G_2", "GNIT" ), 1e-5 );
     BOOST_CHECK_CLOSE( 30.0 * 1.5 + 30.0 * 2.5, ecl_sum_get_group_var( resp, 2, "G_2", "GCIT" ), 1e-5 );
-    BOOST_CHECK_CLOSE( 2 * (30.6 + 30.7 + 30.8),
+    BOOST_CHECK_CLOSE( 2 * (30.6 + 30.7 + 30.8 + 60.6 + 60.7 + 60.8),
                        ecl_sum_get_group_var( resp, 2, "G_2", "GVIT" ), 1e-5 );
 
     /* Injection totals (history) */
     BOOST_CHECK_CLOSE( 30.0, ecl_sum_get_group_var( resp, 1, "G_2", "GWITH" ), 1e-5 );
-    BOOST_CHECK_CLOSE( 0,    ecl_sum_get_group_var( resp, 1, "G_2", "GGITH" ), 1e-5 );
+    BOOST_CHECK_CLOSE( 30000.,    ecl_sum_get_group_var( resp, 1, "G_2", "GGITH" ), 1e-5 );
     BOOST_CHECK_CLOSE( 60.0, ecl_sum_get_group_var( resp, 2, "G_2", "GWITH" ), 1e-5 );
-    BOOST_CHECK_CLOSE( 0,    ecl_sum_get_group_var( resp, 2, "G_2", "GGITH" ), 1e-5 );
+    BOOST_CHECK_CLOSE( 60000.,    ecl_sum_get_group_var( resp, 2, "G_2", "GGITH" ), 1e-5 );
 
     /* gwct - water cut */
     const double gwcut1 = (10.0 + 20.0) / ( 10.0 + 10.1 + 20.0 + 20.1 );
@@ -591,7 +688,7 @@ BOOST_AUTO_TEST_CASE(group_keywords) {
 
     BOOST_CHECK_EQUAL( 0, ecl_sum_get_group_var( resp, 1, "G_1", "GMWIN" ) );
     BOOST_CHECK_EQUAL( 2, ecl_sum_get_group_var( resp, 1, "G_1", "GMWPR" ) );
-    BOOST_CHECK_EQUAL( 1, ecl_sum_get_group_var( resp, 1, "G_2", "GMWIN" ) );
+    BOOST_CHECK_EQUAL( 2, ecl_sum_get_group_var( resp, 1, "G_2", "GMWIN" ) );
     BOOST_CHECK_EQUAL( 0, ecl_sum_get_group_var( resp, 1, "G_2", "GMWPR" ) );
 }
 
@@ -734,6 +831,12 @@ BOOST_AUTO_TEST_CASE(field_keywords) {
     BOOST_CHECK_CLOSE( 10.1 - 10.5 + 20.1 - 20.5,
                                     ecl_sum_get_field_var( resp, 1, "FOPRF" ), 1e-5 );
 
+    BOOST_CHECK_CLOSE( -10.13 - 20.13, ecl_sum_get_field_var( resp, 1, "FWPP" ), 1e-5 );
+    BOOST_CHECK_CLOSE( -10.14 - 20.14, ecl_sum_get_field_var( resp, 1, "FOPP" ), 1e-5 );
+    BOOST_CHECK_CLOSE( -10.15 - 20.15, ecl_sum_get_field_var( resp, 1, "FGPP" ), 1e-5 );
+    BOOST_CHECK_CLOSE(  30.15 + 60.15, ecl_sum_get_field_var( resp, 1, "FGPI" ), 1e-5 );
+    BOOST_CHECK_CLOSE(  30.13 + 60.13, ecl_sum_get_field_var( resp, 1, "FWPI" ), 1e-5 );
+
     /* Production totals */
     BOOST_CHECK_CLOSE( 10.0 + 20.0, ecl_sum_get_field_var( resp, 1, "FWPT" ), 1e-5 );
     BOOST_CHECK_CLOSE( 10.1 + 20.1, ecl_sum_get_field_var( resp, 1, "FOPT" ), 1e-5 );
@@ -788,21 +891,21 @@ BOOST_AUTO_TEST_CASE(field_keywords) {
                                           ecl_sum_get_field_var( resp, 2, "FLPTH" ), 1e-5 );
 
     /* Injection rates */
-    BOOST_CHECK_CLOSE( 30.0, ecl_sum_get_field_var( resp, 1, "FWIR" ), 1e-5 );
-    BOOST_CHECK_CLOSE( 30.2, ecl_sum_get_field_var( resp, 1, "FGIR" ), 1e-5 );
-    BOOST_CHECK_CLOSE( 30.6 + 30.7 + 30.8, ecl_sum_get_field_var( resp, 1, "FVIR" ), 1e-5 );
+    BOOST_CHECK_CLOSE( 30.0 + 60., ecl_sum_get_field_var( resp, 1, "FWIR" ), 1e-5 );
+    BOOST_CHECK_CLOSE( 30.2 + 60.2, ecl_sum_get_field_var( resp, 1, "FGIR" ), 1e-5 );
+    BOOST_CHECK_CLOSE( 30.6 + 30.7 + 30.8 + 60.6 + 60.7 + 60.8, ecl_sum_get_field_var( resp, 1, "FVIR" ), 1e-5 );
     BOOST_CHECK_CLOSE( 30.0 * 1.5, ecl_sum_get_field_var( resp, 1, "FCIR" ), 1e-5 );
     BOOST_CHECK_CLOSE( 30.0 * 2.5, ecl_sum_get_field_var( resp, 2, "FCIR" ), 1e-5 );
 
     /* Injection totals */
-    BOOST_CHECK_CLOSE( 30.0,     ecl_sum_get_field_var( resp, 1, "FWIT" ), 1e-5 );
-    BOOST_CHECK_CLOSE( 30.2,     ecl_sum_get_field_var( resp, 1, "FGIT" ), 1e-5 );
-    BOOST_CHECK_CLOSE( 30.6 + 30.7 + 30.8, ecl_sum_get_field_var( resp, 1, "FVIT" ), 1e-5 );
+    BOOST_CHECK_CLOSE( 30.0 + 60.,     ecl_sum_get_field_var( resp, 1, "FWIT" ), 1e-5 );
+    BOOST_CHECK_CLOSE( 30.2 + 60.2,    ecl_sum_get_field_var( resp, 1, "FGIT" ), 1e-5 );
+    BOOST_CHECK_CLOSE( 30.6 + 30.7 + 30.8 + 60.6 + 60.7 + 60.8, ecl_sum_get_field_var( resp, 1, "FVIT" ), 1e-5 );
     BOOST_CHECK_CLOSE( 30.0 * 1.5,         ecl_sum_get_field_var( resp, 1, "FCIT" ), 1e-5 );
 
-    BOOST_CHECK_CLOSE( 2 * 30.0, ecl_sum_get_field_var( resp, 2, "FWIT" ), 1e-5 );
-    BOOST_CHECK_CLOSE( 2 * 30.2, ecl_sum_get_field_var( resp, 2, "FGIT" ), 1e-5 );
-    BOOST_CHECK_CLOSE( 2 * (30.6 + 30.7 + 30.8), ecl_sum_get_field_var( resp, 2, "FVIT" ), 1e-5 );
+    BOOST_CHECK_CLOSE( 2 * (30.0 + 60.0), ecl_sum_get_field_var( resp, 2, "FWIT" ), 1e-5 );
+    BOOST_CHECK_CLOSE( 2 * (30.2 + 60.2), ecl_sum_get_field_var( resp, 2, "FGIT" ), 1e-5 );
+    BOOST_CHECK_CLOSE( 2 * (30.6 + 30.7 + 30.8 + 60.6 + 60.7 + 60.8), ecl_sum_get_field_var( resp, 2, "FVIT" ), 1e-5 );
     BOOST_CHECK_CLOSE( 30.0 * 1.5 + 30.0 * 2.5,  ecl_sum_get_field_var( resp, 2, "FCIT" ), 1e-5 );
 
     /* Injection totals (history) */
@@ -1067,6 +1170,21 @@ BOOST_AUTO_TEST_CASE(BLOCK_VARIABLES) {
     }
     block_values[std::make_pair("BSWAT", 1)] = 8.0;
     block_values[std::make_pair("BSGAS", 1)] = 9.0;
+    block_values[std::make_pair("BOSAT", 1)] = 0.91;
+    block_values[std::make_pair("BWKR",  2)] = 0.81;
+    block_values[std::make_pair("BOKR",  2)] = 0.71;
+    block_values[std::make_pair("BKRO",  2)] = 0.73;
+    block_values[std::make_pair("BGKR",  2)] = 0.61;
+    block_values[std::make_pair("BKRG",  2)] = 0.63;
+    block_values[std::make_pair("BKRW",  2)] = 0.51;
+    block_values[std::make_pair("BWPC", 11)] = 0.53;
+    block_values[std::make_pair("BGPC", 11)] = 5.3;
+    block_values[std::make_pair("BVWAT", 1)] = 4.1;
+    block_values[std::make_pair("BWVIS", 1)] = 4.3;
+    block_values[std::make_pair("BVGAS", 1)] = 0.031;
+    block_values[std::make_pair("BGVIS", 1)] = 0.037;
+    block_values[std::make_pair("BVOIL", 1)] = 31.0;
+    block_values[std::make_pair("BOVIS", 1)] = 33.0;
 
     out::Summary writer( cfg.es, cfg.config, cfg.grid, cfg.schedule, cfg.name );
     writer.add_timestep( 0, 0 * day, cfg.es, cfg.schedule, cfg.wells ,  {},{}, block_values);
@@ -1088,8 +1206,23 @@ BOOST_AUTO_TEST_CASE(BLOCK_VARIABLES) {
 
     }
 
-    BOOST_CHECK_CLOSE( 8.0 , units.to_si( UnitSystem::measure::identity , ecl_sum_get_general_var( resp, 1, "BSWAT:1,1,1")) , 1e-5);
-    BOOST_CHECK_CLOSE( 9.0 , units.to_si( UnitSystem::measure::identity , ecl_sum_get_general_var( resp, 1, "BSGAS:1,1,1")) , 1e-5);
+    BOOST_CHECK_CLOSE( 8.0   , units.to_si( UnitSystem::measure::identity  , ecl_sum_get_general_var( resp, 1, "BSWAT:1,1,1")) , 1e-5);
+    BOOST_CHECK_CLOSE( 9.0   , units.to_si( UnitSystem::measure::identity  , ecl_sum_get_general_var( resp, 1, "BSGAS:1,1,1")) , 1e-5);
+    BOOST_CHECK_CLOSE( 0.91  , units.to_si( UnitSystem::measure::identity  , ecl_sum_get_general_var( resp, 1, "BOSAT:1,1,1")) , 1e-5);
+    BOOST_CHECK_CLOSE( 0.81  , units.to_si( UnitSystem::measure::identity  , ecl_sum_get_general_var( resp, 1, "BWKR:2,1,1"))  , 1e-5);
+    BOOST_CHECK_CLOSE( 0.71  , units.to_si( UnitSystem::measure::identity  , ecl_sum_get_general_var( resp, 1, "BOKR:2,1,1"))  , 1e-5);
+    BOOST_CHECK_CLOSE( 0.73  , units.to_si( UnitSystem::measure::identity  , ecl_sum_get_general_var( resp, 1, "BKRO:2,1,1"))  , 1e-5);
+    BOOST_CHECK_CLOSE( 0.61  , units.to_si( UnitSystem::measure::identity  , ecl_sum_get_general_var( resp, 1, "BGKR:2,1,1"))  , 1e-5);
+    BOOST_CHECK_CLOSE( 0.63  , units.to_si( UnitSystem::measure::identity  , ecl_sum_get_general_var( resp, 1, "BKRG:2,1,1"))  , 1e-5);
+    BOOST_CHECK_CLOSE( 0.51  , units.to_si( UnitSystem::measure::identity  , ecl_sum_get_general_var( resp, 1, "BKRW:2,1,1"))  , 1e-5);
+    BOOST_CHECK_CLOSE( 0.53  , units.to_si( UnitSystem::measure::pressure  , ecl_sum_get_general_var( resp, 1, "BWPC:1,2,1"))  , 1e-5);
+    BOOST_CHECK_CLOSE( 5.3   , units.to_si( UnitSystem::measure::pressure  , ecl_sum_get_general_var( resp, 1, "BGPC:1,2,1"))  , 1e-5);
+    BOOST_CHECK_CLOSE( 4.1   , units.to_si( UnitSystem::measure::viscosity , ecl_sum_get_general_var( resp, 1, "BVWAT:1,1,1")) , 1e-5);
+    BOOST_CHECK_CLOSE( 4.3   , units.to_si( UnitSystem::measure::viscosity , ecl_sum_get_general_var( resp, 1, "BWVIS:1,1,1")) , 1e-5);
+    BOOST_CHECK_CLOSE( 0.031 , units.to_si( UnitSystem::measure::viscosity , ecl_sum_get_general_var( resp, 1, "BVGAS:1,1,1")) , 1e-5);
+    BOOST_CHECK_CLOSE( 0.037 , units.to_si( UnitSystem::measure::viscosity , ecl_sum_get_general_var( resp, 1, "BGVIS:1,1,1")) , 1e-5);
+    BOOST_CHECK_CLOSE( 31.0  , units.to_si( UnitSystem::measure::viscosity , ecl_sum_get_general_var( resp, 1, "BVOIL:1,1,1")) , 1e-5);
+    BOOST_CHECK_CLOSE( 33.0  , units.to_si( UnitSystem::measure::viscosity , ecl_sum_get_general_var( resp, 1, "BOVIS:1,1,1")) , 1e-5);
 
     BOOST_CHECK_CLOSE( 100                , ecl_sum_get_well_completion_var( resp, 1, "W_1", "CTFAC", 1)   , 1e-5);
     BOOST_CHECK_CLOSE( 2.1430730819702148 , ecl_sum_get_well_completion_var( resp, 1, "W_2", "CTFAC", 2)   , 1e-5);
@@ -1321,15 +1454,16 @@ BOOST_AUTO_TEST_CASE(efficiency_factor) {
 
 BOOST_AUTO_TEST_CASE(Test_SummaryState) {
     Opm::SummaryState st;
-    st.add("WWCT:OP_2", 100);
+    st.update("WWCT:OP_2", 100);
     BOOST_CHECK_CLOSE(st.get("WWCT:OP_2"), 100, 1e-5);
     BOOST_CHECK_THROW(st.get("NO_SUCH_KEY"), std::out_of_range);
     BOOST_CHECK(st.has("WWCT:OP_2"));
     BOOST_CHECK(!st.has("NO_SUCH_KEY"));
 
 
-    st.add_well_var("OP1", "WWCT", 0.75);
-    st.add_well_var("OP2", "WWCT", 0.75);
+    st.update_well_var("OP1", "WWCT", 0.75);
+    st.update_well_var("OP2", "WWCT", 0.75);
+    st.update_well_var("OP3", "WOPT", 0.75);
     BOOST_CHECK( st.has_well_var("OP1", "WWCT"));
     BOOST_CHECK_EQUAL( st.get_well_var("OP1", "WWCT"), 0.75);
     BOOST_CHECK_EQUAL( st.get_well_var("OP1", "WWCT"), st.get("WWCT:OP1"));
@@ -1339,8 +1473,15 @@ BOOST_AUTO_TEST_CASE(Test_SummaryState) {
     BOOST_CHECK_EQUAL( wopr_wells.size() , 0);
 
     const auto& wwct_wells = st.wells("WWCT");
+    BOOST_CHECK_EQUAL( wwct_wells.size(), 2);
     BOOST_CHECK_EQUAL(std::count(wwct_wells.begin(), wwct_wells.end(), "OP1"), 1);
     BOOST_CHECK_EQUAL(std::count(wwct_wells.begin(), wwct_wells.end(), "OP2"), 1);
+
+    const auto& all_wells = st.wells();
+    BOOST_CHECK_EQUAL( all_wells.size(), 3);
+    BOOST_CHECK_EQUAL(std::count(all_wells.begin(), all_wells.end(), "OP1"), 1);
+    BOOST_CHECK_EQUAL(std::count(all_wells.begin(), all_wells.end(), "OP2"), 1);
+    BOOST_CHECK_EQUAL(std::count(all_wells.begin(), all_wells.end(), "OP3"), 1);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
@@ -1607,12 +1748,12 @@ BOOST_AUTO_TEST_CASE(Group_Vectors_Correct)
         BOOST_CHECK_CLOSE(rstrt.get("GVPT:G_2"), 0.0, 1.0e-10);
 
         // Injection rates
-        BOOST_CHECK_CLOSE(rstrt.get("GWIR:G_2"), 30.0, 1.0e-10);
-        BOOST_CHECK_CLOSE(rstrt.get("GGIR:G_2"), 30.2, 1.0e-10);
+        BOOST_CHECK_CLOSE(rstrt.get("GWIR:G_2"), 30.0 + 60.0, 1.0e-10);
+        BOOST_CHECK_CLOSE(rstrt.get("GGIR:G_2"), 30.2 + 60.2, 1.0e-10);
 
         // Injection totals
-        BOOST_CHECK_CLOSE(rstrt.get("GWIT:G_2"), 2 * 1.0 * 30.0, 1.0e-10);
-        BOOST_CHECK_CLOSE(rstrt.get("GGIT:G_2"), 2 * 1.0 * 30.2, 1.0e-10);
+        BOOST_CHECK_CLOSE(rstrt.get("GWIT:G_2"), 2 * 1.0 * (30.0 + 60.0), 1.0e-10);
+        BOOST_CHECK_CLOSE(rstrt.get("GGIT:G_2"), 2 * 1.0 * (30.2 + 60.2), 1.0e-10);
 
         // Water cut
         BOOST_CHECK_CLOSE(rstrt.get("GWCT:G_2"), 0.0, 1.0e-10);
@@ -1658,12 +1799,12 @@ BOOST_AUTO_TEST_CASE(Field_Vectors_Correct)
                        (20.6 + 20.7 + 20.8)), 1.0e-10);
 
     // Injection rates (F = G_2 = W_3)
-    BOOST_CHECK_CLOSE(rstrt.get("FWIR"), 30.0, 1.0e-10);
-    BOOST_CHECK_CLOSE(rstrt.get("FGIR"), 30.2, 1.0e-10);
+    BOOST_CHECK_CLOSE(rstrt.get("FWIR"), (30.0 + 60.0), 1.0e-10);
+    BOOST_CHECK_CLOSE(rstrt.get("FGIR"), (30.2 + 60.2), 1.0e-10);
 
     // Injection totals (F = G_2 = W_3)
-    BOOST_CHECK_CLOSE(rstrt.get("FWIT"), 2 * 1.0 * 30.0, 1.0e-10);
-    BOOST_CHECK_CLOSE(rstrt.get("FGIT"), 2 * 1.0 * 30.2, 1.0e-10);
+    BOOST_CHECK_CLOSE(rstrt.get("FWIT"), 2 * 1.0 * (30.0 + 60.0), 1.0e-10);
+    BOOST_CHECK_CLOSE(rstrt.get("FGIT"), 2 * 1.0 * (30.2 + 60.2), 1.0e-10);
 
     // Water cut (F = G_1 = W_1 + W_2)
     BOOST_CHECK_CLOSE(rstrt.get("FWCT"),
@@ -2829,6 +2970,228 @@ BOOST_AUTO_TEST_CASE(Write_Read)
         BOOST_CHECK(!hasSegmentVariable_Prod01(resp, "SWFR", segID));
         BOOST_CHECK(!hasSegmentVariable_Prod01(resp, "SPR" , segID));
     }
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+// =====================================================================
+
+BOOST_AUTO_TEST_SUITE(Reset_Cumulative_Vectors)
+
+BOOST_AUTO_TEST_CASE(Reset)
+{
+    const auto config = setup { "test.Reset.Cumulative" };
+    ::Opm::out::Summary smry {
+        config.es, config.config, config.grid,
+        config.schedule, "Ignore.This"
+    };
+
+    auto rstrt = ::Opm::SummaryState{};
+    rstrt.update("WOPT:W_1", 1.0);
+    rstrt.update("WWPT:W_1", 2.0);
+    rstrt.update("WGPT:W_1", 3.0);
+    rstrt.update("WVPT:W_1", 4.0);
+
+    rstrt.update("WWIT:W_1", 5.0);
+    rstrt.update("WGIT:W_1", 6.0);
+
+    rstrt.update("WOPTH:W_1", 0.1);
+    rstrt.update("WWPTH:W_1", 0.2);
+    rstrt.update("WGPTH:W_1", 0.3);
+
+    rstrt.update("WWITH:W_1", 0.5);
+    rstrt.update("WGITH:W_1", 0.6);
+
+    rstrt.update("GOPT:NoSuchGroup", 1.0);
+    rstrt.update("GWPT:NoSuchGroup", 2.0);
+    rstrt.update("GGPT:NoSuchGroup", 3.0);
+    rstrt.update("GVPT:NoSuchGroup", 4.0);
+
+    rstrt.update("GWIT:NoSuchGroup", 5.0);
+    rstrt.update("GGIT:NoSuchGroup", 6.0);
+
+    rstrt.update("FOPT", 10.0);
+    rstrt.update("FWPT", 20.0);
+    rstrt.update("FGPT", 30.0);
+    rstrt.update("FVPT", 40.0);
+
+    rstrt.update("FWIT", 50.0);
+    rstrt.update("FGIT", 60.0);
+
+    rstrt.update("FOPTH", 0.01);
+    rstrt.update("FWPTH", 0.02);
+    rstrt.update("FGPTH", 0.03);
+
+    rstrt.update("FWITH", 0.05);
+    rstrt.update("FGITH", 0.06);
+
+    smry.reset_cumulative_quantities(rstrt);
+
+    const auto& sumstate = smry.get_restart_vectors();
+
+    // Cumulatives don't affect rates, BHP, WCT, or GOR.
+    for (const auto* w : { "W_1", "W_2", "W_3" }) {
+        auto get = [w, &sumstate](const std::string& vector) {
+            return sumstate.get(vector + ':' + std::string(w));
+        };
+
+        BOOST_CHECK_THROW(get("WWPR"), std::out_of_range);
+        BOOST_CHECK_THROW(get("WOPR"), std::out_of_range);
+        BOOST_CHECK_THROW(get("WGPR"), std::out_of_range);
+        BOOST_CHECK_THROW(get("WVPR"), std::out_of_range);
+
+        BOOST_CHECK_THROW(get("WWIR"), std::out_of_range);
+        BOOST_CHECK_THROW(get("WGIR"), std::out_of_range);
+
+        BOOST_CHECK_THROW(get("WBHP"), std::out_of_range);
+        BOOST_CHECK_THROW(get("WWCT"), std::out_of_range);
+        BOOST_CHECK_THROW(get("WGOR"), std::out_of_range);
+    }
+
+    // Cumulatives reset for W_1.
+    BOOST_CHECK_CLOSE(sumstate.get("WOPT:W_1"), 1.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(sumstate.get("WWPT:W_1"), 2.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(sumstate.get("WGPT:W_1"), 3.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(sumstate.get("WVPT:W_1"), 4.0, 1.0e-10);
+
+    BOOST_CHECK_CLOSE(sumstate.get("WWIT:W_1"), 5.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(sumstate.get("WGIT:W_1"), 6.0, 1.0e-10);
+
+    BOOST_CHECK_CLOSE(sumstate.get("WOPTH:W_1"), 0.1, 1.0e-10);
+    BOOST_CHECK_CLOSE(sumstate.get("WWPTH:W_1"), 0.2, 1.0e-10);
+    BOOST_CHECK_CLOSE(sumstate.get("WGPTH:W_1"), 0.3, 1.0e-10);
+
+    BOOST_CHECK_CLOSE(sumstate.get("WWITH:W_1"), 0.5, 1.0e-10);
+    BOOST_CHECK_CLOSE(sumstate.get("WGITH:W_1"), 0.6, 1.0e-10);
+
+    // Cumulatives unset for W_2.
+    BOOST_CHECK_CLOSE(sumstate.get("WOPT:W_2"), 0.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(sumstate.get("WWPT:W_2"), 0.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(sumstate.get("WGPT:W_2"), 0.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(sumstate.get("WVPT:W_2"), 0.0, 1.0e-10);
+
+    BOOST_CHECK_CLOSE(sumstate.get("WWIT:W_2"), 0.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(sumstate.get("WGIT:W_2"), 0.0, 1.0e-10);
+
+    BOOST_CHECK_CLOSE(sumstate.get("WOPTH:W_2"), 0.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(sumstate.get("WWPTH:W_2"), 0.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(sumstate.get("WGPTH:W_2"), 0.0, 1.0e-10);
+
+    BOOST_CHECK_CLOSE(sumstate.get("WWITH:W_2"), 0.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(sumstate.get("WGITH:W_2"), 0.0, 1.0e-10);
+
+    // Cumulatives unset for W_3.
+    BOOST_CHECK_CLOSE(sumstate.get("WOPT:W_3"), 0.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(sumstate.get("WWPT:W_3"), 0.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(sumstate.get("WGPT:W_3"), 0.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(sumstate.get("WVPT:W_3"), 0.0, 1.0e-10);
+
+    BOOST_CHECK_CLOSE(sumstate.get("WWIT:W_3"), 0.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(sumstate.get("WGIT:W_3"), 0.0, 1.0e-10);
+
+    BOOST_CHECK_CLOSE(sumstate.get("WOPTH:W_3"), 0.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(sumstate.get("WWPTH:W_3"), 0.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(sumstate.get("WGPTH:W_3"), 0.0, 1.0e-10);
+
+    BOOST_CHECK_CLOSE(sumstate.get("WWITH:W_3"), 0.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(sumstate.get("WGITH:W_3"), 0.0, 1.0e-10);
+
+    // Cumulatives unset for G_1.
+    BOOST_CHECK_CLOSE(sumstate.get("GOPT:G_1"), 0.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(sumstate.get("GWPT:G_1"), 0.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(sumstate.get("GGPT:G_1"), 0.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(sumstate.get("GVPT:G_1"), 0.0, 1.0e-10);
+
+    BOOST_CHECK_CLOSE(sumstate.get("GWIT:G_1"), 0.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(sumstate.get("GGIT:G_1"), 0.0, 1.0e-10);
+
+    BOOST_CHECK_CLOSE(sumstate.get("GOPTH:G_1"), 0.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(sumstate.get("GWPTH:G_1"), 0.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(sumstate.get("GGPTH:G_1"), 0.0, 1.0e-10);
+
+    BOOST_CHECK_CLOSE(sumstate.get("GWITH:G_1"), 0.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(sumstate.get("GGITH:G_1"), 0.0, 1.0e-10);
+
+    // Cumulatives unset for G_2.
+    BOOST_CHECK_CLOSE(sumstate.get("GOPT:G_2"), 0.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(sumstate.get("GWPT:G_2"), 0.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(sumstate.get("GGPT:G_2"), 0.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(sumstate.get("GVPT:G_2"), 0.0, 1.0e-10);
+
+    BOOST_CHECK_CLOSE(sumstate.get("GWIT:G_2"), 0.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(sumstate.get("GGIT:G_2"), 0.0, 1.0e-10);
+
+    BOOST_CHECK_CLOSE(sumstate.get("GOPTH:G_2"), 0.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(sumstate.get("GWPTH:G_2"), 0.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(sumstate.get("GGPTH:G_2"), 0.0, 1.0e-10);
+
+    BOOST_CHECK_CLOSE(sumstate.get("GWITH:G_2"), 0.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(sumstate.get("GGITH:G_2"), 0.0, 1.0e-10);
+
+    // Cumulatives reset for FIELD.
+    BOOST_CHECK_CLOSE(sumstate.get("FOPT"), 10.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(sumstate.get("FWPT"), 20.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(sumstate.get("FGPT"), 30.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(sumstate.get("FVPT"), 40.0, 1.0e-10);
+
+    BOOST_CHECK_CLOSE(sumstate.get("FWIT"), 50.0, 1.0e-10);
+    BOOST_CHECK_CLOSE(sumstate.get("FGIT"), 60.0, 1.0e-10);
+
+    BOOST_CHECK_CLOSE(sumstate.get("FOPTH"), 0.01, 1.0e-10);
+    BOOST_CHECK_CLOSE(sumstate.get("FWPTH"), 0.02, 1.0e-10);
+    BOOST_CHECK_CLOSE(sumstate.get("FGPTH"), 0.03, 1.0e-10);
+
+    BOOST_CHECK_CLOSE(sumstate.get("FWITH"), 0.05, 1.0e-10);
+    BOOST_CHECK_CLOSE(sumstate.get("FGITH"), 0.06, 1.0e-10);
+}
+
+
+
+BOOST_AUTO_TEST_CASE(SummaryState_TOTAL) {
+    SummaryState st;
+    st.update("FOPR", 100);
+    BOOST_CHECK_EQUAL(st.get("FOPR"), 100);
+    st.update("FOPR", 100);
+    BOOST_CHECK_EQUAL(st.get("FOPR"), 100);
+    st.update("WOPR:OP1", 100);
+    BOOST_CHECK_EQUAL(st.get("WOPR:OP1"), 100);
+    st.update("WOPR:OP1", 100);
+    BOOST_CHECK_EQUAL(st.get("WOPR:OP1"), 100);
+
+    st.update("FOPT", 100);
+    BOOST_CHECK_EQUAL(st.get("FOPT"), 100);
+    st.update("FOPT", 100);
+    BOOST_CHECK_EQUAL(st.get("FOPT"), 200);
+    st.update("WOPT:OP1", 100);
+    BOOST_CHECK_EQUAL(st.get("WOPT:OP1"), 100);
+    st.update("WOPT:OP1", 100);
+    BOOST_CHECK_EQUAL(st.get("WOPT:OP1"), 200);
+
+    st.update_well_var("OP1", "WOPR", 100);
+    BOOST_CHECK_EQUAL(st.get_well_var("OP1", "WOPR"), 100);
+    st.update_well_var("OP1", "WOPR", 100);
+    BOOST_CHECK_EQUAL(st.get_well_var("OP1", "WOPR"), 100);
+
+    st.update_well_var("OP1", "WOPT", 100);
+    BOOST_CHECK_EQUAL(st.get_well_var("OP1", "WOPT"), 100);
+    st.update_well_var("OP1", "WOPT", 100);
+    BOOST_CHECK_EQUAL(st.get_well_var("OP1", "WOPT"), 200);
+
+    st.update_well_var("OP1", "WOPTH", 100);
+    BOOST_CHECK_EQUAL(st.get_well_var("OP1", "WOPTH"), 100);
+    st.update_well_var("OP1", "WOPTH", 100);
+    BOOST_CHECK_EQUAL(st.get_well_var("OP1", "WOPTH"), 200);
+
+    st.update("FOPTH", 100);
+    BOOST_CHECK_EQUAL(st.get("FOPTH"), 100);
+    st.update("FOPTH", 100);
+    BOOST_CHECK_EQUAL(st.get("FOPTH"), 200);
+
+
+    st.update_elapsed(100);
+    BOOST_CHECK_EQUAL(st.get_elapsed(), 100);
+    st.update_elapsed(100);
+    BOOST_CHECK_EQUAL(st.get_elapsed(), 200);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

@@ -24,6 +24,7 @@
 
 #include <boost/date_time/posix_time/posix_time_types.hpp>
 
+#include <opm/parser/eclipse/Parser/ParseContext.hpp>
 #include <opm/parser/eclipse/EclipseState/Schedule/DynamicState.hpp>
 #include <opm/parser/eclipse/EclipseState/Schedule/DynamicVector.hpp>
 #include <opm/parser/eclipse/EclipseState/Schedule/Events.hpp>
@@ -32,15 +33,16 @@
 #include <opm/parser/eclipse/EclipseState/Schedule/OilVaporizationProperties.hpp>
 #include <opm/parser/eclipse/EclipseState/Schedule/ScheduleEnums.hpp>
 #include <opm/parser/eclipse/EclipseState/Schedule/Tuning.hpp>
-#include <opm/parser/eclipse/EclipseState/Schedule/Well.hpp>
 #include <opm/parser/eclipse/EclipseState/Util/OrderedMap.hpp>
 #include <opm/parser/eclipse/EclipseState/Schedule/MessageLimits.hpp>
 #include <opm/parser/eclipse/EclipseState/Runspec.hpp>
-#include <opm/parser/eclipse/Parser/ParseContext.hpp>
+#include <opm/parser/eclipse/EclipseState/Schedule/RFTConfig.hpp>
 #include <opm/parser/eclipse/EclipseState/Schedule/VFPInjTable.hpp>
 #include <opm/parser/eclipse/EclipseState/Schedule/VFPProdTable.hpp>
-#include <opm/parser/eclipse/EclipseState/Schedule/WellTestConfig.hpp>
-#include <opm/parser/eclipse/EclipseState/Schedule/Actions.hpp>
+#include <opm/parser/eclipse/EclipseState/Schedule/Well/Well.hpp>
+#include <opm/parser/eclipse/EclipseState/Schedule/Well/Well2.hpp>
+#include <opm/parser/eclipse/EclipseState/Schedule/Well/WellTestConfig.hpp>
+#include <opm/parser/eclipse/EclipseState/Schedule/Action/Actions.hpp>
 
 namespace Opm
 {
@@ -58,6 +60,8 @@ namespace Opm
     class TimeMap;
     class UnitSystem;
     class ErrorGuard;
+    class WListManager;
+    class UDQInput;
 
     class Schedule {
     public:
@@ -102,6 +106,7 @@ namespace Opm
         time_t getStartTime() const;
         time_t posixStartTime() const;
         time_t posixEndTime() const;
+        time_t simTime(size_t timeStep) const;
         double seconds(size_t timeStep) const;
         double stepLength(size_t timeStep) const;
 
@@ -109,34 +114,31 @@ namespace Opm
 
         size_t numWells() const;
         size_t numWells(size_t timestep) const;
-        size_t getMaxNumConnectionsForWells(size_t timestep) const;
         bool hasWell(const std::string& wellName) const;
+
+        std::vector<std::string> wellNames(const std::string& pattern, size_t timeStep, const std::vector<std::string>& matching_wells = {}) const;
+        std::vector<std::string> wellNames(const std::string& pattern) const;
+        std::vector<std::string> wellNames(size_t timeStep) const;
+        std::vector<std::string> wellNames() const;
+
+        void updateWell(std::shared_ptr<Well2> well, size_t reportStep);
+        const Well2& getWell2(const std::string& wellName, size_t timeStep) const;
+        std::vector< const Well2* > getChildWells2(const std::string& group_name, size_t timeStep, GroupWellQueryMode query_mode) const;
         const Well* getWell(const std::string& wellName) const;
         std::vector< const Well* > getOpenWells(size_t timeStep) const;
         std::vector< const Well* > getWells() const;
         std::vector< const Well* > getWells(size_t timeStep) const;
-
-        /*
-          The overload with a group name argument will return all
-          wells beneath that particular group; i.e.
-
-             getWells("FIELD",t);
-
-          is an inefficient way to get all the wells defined at time
-          't'.
-        */
-        //std::vector< const Group& > getChildGroups(const std::string& group_name, size_t timeStep) const;
-        std::vector< const Group* > getChildGroups(const std::string& group_name, size_t timeStep) const;
-        std::vector< const Well* > getWells(const std::string& group, size_t timeStep) const;
-        std::vector< const Well* > getChildWells(const std::string& group_name, size_t timeStep) const;
-        std::vector< const Well* > getWellsMatching( const std::string& ) const;
+        std::vector< const Well* > getChildWells(const std::string& group_name, size_t timeStep, GroupWellQueryMode query_mode) const;
         const OilVaporizationProperties& getOilVaporizationProperties(size_t timestep) const;
 
         const WellTestConfig& wtestConfig(size_t timestep) const;
-        const Actions& actionConfig() const;
+        const WListManager& getWListManager(size_t timeStep) const;
+        const UDQInput& getUDQConfig(size_t timeStep) const;
+        const Actions& actions() const;
         void evalAction(const SummaryState& summary_state, size_t timeStep);
 
         const GroupTree& getGroupTree(size_t t) const;
+        std::vector< const Group* > getChildGroups(const std::string& group_name, size_t timeStep) const;
         size_t numGroups() const;
         size_t numGroups(size_t timeStep) const;
         bool hasGroup(const std::string& groupName) const;
@@ -147,7 +149,10 @@ namespace Opm
         const MessageLimits& getMessageLimits() const;
         void invalidNamePattern (const std::string& namePattern, const ParseContext& parseContext, ErrorGuard& errors, const DeckKeyword& keyword) const;
 
+        const RFTConfig& rftConfig() const;
         const Events& getEvents() const;
+        const Events& getWellEvents(const std::string& well) const;
+        bool hasWellEvent(const std::string& well, uint64_t event_mask, size_t reportStep) const;
         const Deck& getModifierDeck(size_t timeStep) const;
         bool hasOilVaporizationProperties() const;
         const VFPProdTable& getVFPProdTable(int table_id, size_t timeStep) const;
@@ -160,10 +165,13 @@ namespace Opm
         */
         void filterConnections(const EclipseGrid& grid);
         size_t size() const;
+
+        void applyAction(size_t reportStep, const ActionX& action, const std::vector<std::string>& matching_wells);
     private:
         TimeMap m_timeMap;
-        OrderedMap< Well > m_wells;
-        OrderedMap< Group > m_groups;
+        OrderedMap< std::string, Well > m_wells;
+        OrderedMap< std::string, Group > m_groups;
+        OrderedMap< std::string, DynamicState<std::shared_ptr<Well2>>> wells_static;
         DynamicState< GroupTree > m_rootGroupTree;
         DynamicState< OilVaporizationProperties > m_oilvaporizationproperties;
         Events m_events;
@@ -174,23 +182,28 @@ namespace Opm
         std::map<int, DynamicState<std::shared_ptr<VFPProdTable>>> vfpprod_tables;
         std::map<int, DynamicState<std::shared_ptr<VFPInjTable>>> vfpinj_tables;
         DynamicState<std::shared_ptr<WellTestConfig>> wtest_config;
+        DynamicState<std::shared_ptr<WListManager>> wlist_manager;
+        DynamicState<std::shared_ptr<UDQInput>> udq_config;
+        DynamicState<WellProducer::ControlModeEnum> global_whistctl_mode;
+        RFTConfig rft_config;
 
-        WellProducer::ControlModeEnum m_controlModeWHISTCTL;
-        Actions actions;
+        Actions m_actions;
 
-        std::vector< Well* > getWells(const std::string& wellNamePattern);
+        std::vector< Well* > getWells(const std::string& wellNamePattern, const std::vector<std::string>& matching_wells = {});
         std::vector< Group* > getGroups(const std::string& groupNamePattern);
+        std::map<std::string,Events> well_events;
 
-        void updateWellStatus( Well& well, size_t reportStep , WellCommon::StatusEnum status);
-        void addWellToGroup( Group& newGroup , Well& well , size_t timeStep);
+        bool updateWellStatus( const std::string& well, size_t reportStep , WellCommon::StatusEnum status);
+        void addWellToGroup( Group& newGroup , const std::string& wellName , size_t timeStep);
         void iterateScheduleSection(const ParseContext& parseContext ,  ErrorGuard& errors, const SCHEDULESection& , const EclipseGrid& grid,
                                     const Eclipse3DProperties& eclipseProperties);
         bool handleGroupFromWELSPECS(const std::string& groupName, GroupTree& newTree) const;
         void addGroup(const std::string& groupName , size_t timeStep);
         void addWell(const std::string& wellName, const DeckRecord& record, size_t timeStep, WellCompletion::CompletionOrderEnum wellCompletionOrder);
+        void handleUDQ(const DeckKeyword& keyword, size_t currentStep);
+        void handleWLIST(const DeckKeyword& keyword, size_t currentStep);
         void handleCOMPORD(const ParseContext& parseContext, ErrorGuard& errors, const DeckKeyword& compordKeyword, size_t currentStep);
         void handleWELSPECS( const SCHEDULESection&, size_t, size_t  );
-        void handleWCONProducer( const DeckKeyword& keyword, size_t currentStep, bool isPredictionMode,  const ParseContext& parseContext, ErrorGuard& errors);
         void handleWCONHIST( const DeckKeyword& keyword, size_t currentStep, const ParseContext& parseContext, ErrorGuard& errors);
         void handleWCONPROD( const DeckKeyword& keyword, size_t currentStep, const ParseContext& parseContext, ErrorGuard& errors);
         void handleWGRUPCON( const DeckKeyword& keyword, size_t currentStep);
@@ -207,7 +220,7 @@ namespace Opm
         void handleWSKPTAB( const DeckKeyword& keyword,  const size_t currentStep, const ParseContext& parseContext, ErrorGuard& errors);
         void handleWINJTEMP( const DeckKeyword& keyword, size_t currentStep, const ParseContext& parseContext, ErrorGuard& errors);
         void handleWCONINJH( const SCHEDULESection&,  const DeckKeyword& keyword, size_t currentStep, const ParseContext& parseContext, ErrorGuard& errors);
-        void handleWELOPEN( const DeckKeyword& keyword, size_t currentStep, const ParseContext& parseContext, ErrorGuard& errors );
+        void handleWELOPEN( const DeckKeyword& keyword, size_t currentStep, const ParseContext& parseContext, ErrorGuard& errors, const std::vector<std::string>& matching_wells = {});
         void handleWELTARG( const SCHEDULESection&,  const DeckKeyword& keyword, size_t currentStep, const ParseContext& parseContext, ErrorGuard& errors);
         void handleGCONINJE( const SCHEDULESection&,  const DeckKeyword& keyword, size_t currentStep, const ParseContext& parseContext, ErrorGuard& errors);
         void handleGCONPROD( const DeckKeyword& keyword, size_t currentStep, const ParseContext& parseContext, ErrorGuard& errors);
@@ -226,7 +239,7 @@ namespace Opm
         void handleDRVDTR( const DeckKeyword& keyword, size_t currentStep);
         void handleVAPPARS( const DeckKeyword& keyword, size_t currentStep);
         void handleWECON( const DeckKeyword& keyword, size_t currentStep, const ParseContext& parseContext, ErrorGuard& errors);
-        void handleWHISTCTL(const ParseContext& parseContext, ErrorGuard& errors, const DeckKeyword& keyword);
+        void handleWHISTCTL(const DeckKeyword& keyword, std::size_t currentStep, const ParseContext& parseContext, ErrorGuard& errors);
         void handleMESSAGES(const DeckKeyword& keyword, size_t currentStep);
         void handleVFPPROD(const DeckKeyword& vfpprodKeyword, const UnitSystem& unit_system, size_t currentStep);
         void handleVFPINJ(const DeckKeyword& vfpprodKeyword, const UnitSystem& unit_system, size_t currentStep);
@@ -241,11 +254,10 @@ namespace Opm
                            const Eclipse3DProperties& eclipseProperties,
                            const UnitSystem& unit_system,
                            std::vector<std::pair<const DeckKeyword*, size_t > >& rftProperties);
-
-        static double convertInjectionRateToSI(double rawRate, WellInjector::TypeEnum wellType, const Opm::UnitSystem &unitSystem);
-        static double convertInjectionRateToSI(double rawRate, Phase wellPhase, const Opm::UnitSystem &unitSystem);
-        static bool convertEclipseStringToBool(const std::string& eclipseString);
-
+        void addWellEvent(const std::string& well, ScheduleEvents::Events event, size_t reportStep);
+#ifdef WELL_TEST
+        bool checkWells(const ParseContext& parseContext, ErrorGuard& errors) const;
+#endif
     };
 }
 

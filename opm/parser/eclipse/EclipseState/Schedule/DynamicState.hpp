@@ -24,6 +24,7 @@
 #include <stdexcept>
 #include <vector>
 #include <algorithm>
+#include <utility>
 
 #include <opm/parser/eclipse/EclipseState/Schedule/TimeMap.hpp>
 
@@ -88,6 +89,29 @@ class DynamicState {
             std::fill_n( this->m_data.begin(), this->initial_range, initial );
         }
 
+
+        std::vector<std::pair<std::size_t, T>> unique() {
+            if (this->m_data.empty())
+                return {};
+
+            auto& current_value = this->m_data[0];
+            std::size_t current_index = 0;
+            std::vector<std::pair<std::size_t, T>> result{{current_index, current_value}};
+            while (true) {
+                if (this->m_data[current_index] != current_value) {
+                    current_value = this->m_data[current_index];
+                    result.emplace_back(current_index, current_value);
+                }
+
+                current_index++;
+                if (current_index == this->m_data.size())
+                    break;
+            }
+
+            return result;
+        }
+
+
         /**
            If the current value has been changed the method will
            return true, otherwise it will return false.
@@ -143,25 +167,41 @@ class DynamicState {
         }
     }
 
-        /// Will return the index of the first occurence of @value, or
-        /// -1 if @value is not found.
-        int find(const T& value) const {
-            auto iter = std::find( m_data.begin() , m_data.end() , value);
-            if( iter == this->m_data.end() ) return -1;
+    /// Will return the index of the first occurence of @value, or
+    /// -1 if @value is not found.
+    int find(const T& value) const {
+        auto iter = std::find( m_data.begin() , m_data.end() , value);
+        if( iter == this->m_data.end() ) return -1;
 
-            return std::distance( m_data.begin() , iter );
-        }
+        return std::distance( m_data.begin() , iter );
+    }
+
+    template<typename P>
+    int find_if(P&& pred) const {
+        auto iter = std::find_if(m_data.begin(), m_data.end(), std::forward<P>(pred));
+        if( iter == this->m_data.end() ) return -1;
+
+        return std::distance( m_data.begin() , iter );
+    }
+
+    /// Will return the index of the first value which is != @value, or -1
+    /// if all values are == @value
+    int find_not(const T& value) const {
+        auto iter = std::find_if_not( m_data.begin() , m_data.end() , [&value] (const T& elm) { return value == elm; });
+        if( iter == this->m_data.end() ) return -1;
+
+        return std::distance( m_data.begin() , iter );
+    }
+
+    iterator begin() {
+        return this->m_data.begin();
+    }
 
 
+    iterator end() {
+        return this->m_data.end();
+    }
 
-        iterator begin() {
-            return this->m_data.begin();
-        }
-
-
-        iterator end() {
-            return this->m_data.end();
-        }
 
     private:
         std::vector< T > m_data;

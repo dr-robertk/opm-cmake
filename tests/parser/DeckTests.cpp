@@ -517,7 +517,7 @@ BOOST_AUTO_TEST_CASE(get_byNameNonExisting_throws) {
 }
 
 BOOST_AUTO_TEST_CASE(StringsWithSpaceOK) {
-    ParserItem itemString("STRINGITEM1", "" );
+    ParserItem itemString("STRINGITEM1", ParserItem::itype::STRING);
     ParserRecord record1;
     RawRecord rawRecord( " ' VALUE ' " );
     ParseContext parseContext;
@@ -721,4 +721,24 @@ BOOST_AUTO_TEST_CASE(DeckItemEqual) {
     item5.push_back(1.0 - 1e-8);
     BOOST_CHECK( item3.equal( item5 , false, true ));
     BOOST_CHECK( !item3.equal( item5 , false, false ));
+}
+
+
+BOOST_AUTO_TEST_CASE(STRING_TO_BOOL) {
+    BOOST_CHECK( DeckItem::to_bool("TRUE") );
+    BOOST_CHECK( DeckItem::to_bool("T") );
+    BOOST_CHECK( DeckItem::to_bool("YES") );
+    BOOST_CHECK( DeckItem::to_bool("yEs") );
+    BOOST_CHECK( DeckItem::to_bool("Y") );
+    BOOST_CHECK( DeckItem::to_bool("1") );
+    //
+    BOOST_CHECK( !DeckItem::to_bool("falsE") );
+    BOOST_CHECK( !DeckItem::to_bool("f") );
+    BOOST_CHECK( !DeckItem::to_bool("NO") );
+    BOOST_CHECK( !DeckItem::to_bool("N"));
+    BOOST_CHECK( !DeckItem::to_bool("0") );
+    //
+    BOOST_CHECK_THROW(DeckItem::to_bool("NO - not valid"), std::invalid_argument);
+    BOOST_CHECK_THROW(DeckItem::to_bool("YE"), std::invalid_argument);
+    BOOST_CHECK_THROW(DeckItem::to_bool("YE"), std::invalid_argument);
 }

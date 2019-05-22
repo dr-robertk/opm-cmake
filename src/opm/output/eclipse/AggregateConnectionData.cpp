@@ -27,7 +27,7 @@
 #include <opm/parser/eclipse/EclipseState/Grid/EclipseGrid.hpp>
 #include <opm/parser/eclipse/EclipseState/Schedule/Schedule.hpp>
 #include <opm/parser/eclipse/EclipseState/Schedule/ScheduleEnums.hpp>
-#include <opm/parser/eclipse/EclipseState/Schedule/Well.hpp>
+#include <opm/parser/eclipse/EclipseState/Schedule/Well/Well.hpp>
 
 #include <opm/parser/eclipse/Units/UnitSystem.hpp>
 
@@ -246,6 +246,8 @@ namespace {
             using Ix = ::Opm::RestartIO::Helpers::VectorItems::XConn::index;
             using R  = ::Opm::data::Rates::opt;
 
+            xConn[Ix::Pressure] = units.from_si(M::pressure, x.pressure);
+
             // Note flow rate sign.  Treat production rates as positive.
             const auto& Q = x.rates;
 
@@ -313,7 +315,7 @@ captureDeclaredConnData(const Schedule&        sched,
 	allWellConnections.insert(std::make_pair(wl->name(), initConn));
 	const auto it = allWellConnections.find(wl->name());
 	const auto xr = xw.find(wl->name());
-	int rCInd = 0;
+	size_t rCInd = 0;
 	if ((it != allWellConnections.end()) && (xr != xw.end())) {
 	    for (auto nConn = conns.size(), connID = 0*nConn; connID < nConn; connID++) {
 		//

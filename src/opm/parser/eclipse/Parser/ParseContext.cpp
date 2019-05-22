@@ -17,11 +17,11 @@
   along with OPM.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <ert/util/util.h>
 #include <cstdlib>
 #include <iostream>
 
 #include <boost/algorithm/string.hpp>
+#include <ert/util/util.h>
 
 #include <opm/parser/eclipse/Parser/ErrorGuard.hpp>
 #include <opm/parser/eclipse/Parser/InputErrorAction.hpp>
@@ -77,6 +77,14 @@ namespace Opm {
         addKey(PARSE_MISSING_DIMS_KEYWORD, InputError::THROW_EXCEPTION);
         addKey(PARSE_EXTRA_DATA, InputError::THROW_EXCEPTION);
         addKey(PARSE_MISSING_INCLUDE, InputError::EXIT1);
+        addKey(PARSE_LONG_KEYWORD, InputError::WARN);
+
+        addKey(UNIT_SYSTEM_MISMATCH, InputError::THROW_EXCEPTION);
+
+        this->addKey(RUNSPEC_NUMWELLS_TOO_LARGE, InputError::DELAYED_EXIT1);
+        this->addKey(RUNSPEC_CONNS_PER_WELL_TOO_LARGE, InputError::DELAYED_EXIT1);
+        this->addKey(RUNSPEC_NUMGROUPS_TOO_LARGE, InputError::DELAYED_EXIT1);
+        this->addKey(RUNSPEC_GROUPSIZE_TOO_LARGE, InputError::DELAYED_EXIT1);
 
         addKey(UNSUPPORTED_SCHEDULE_GEO_MODIFIER, InputError::THROW_EXCEPTION);
         addKey(UNSUPPORTED_COMPORD_TYPE, InputError::THROW_EXCEPTION);
@@ -88,12 +96,20 @@ namespace Opm {
         addKey(SUMMARY_UNKNOWN_WELL, InputError::THROW_EXCEPTION);
         addKey(SUMMARY_UNKNOWN_GROUP, InputError::THROW_EXCEPTION);
         addKey(SUMMARY_UNHANDLED_KEYWORD, InputError::WARN);
+        addKey(SUMMARY_UNDEFINED_UDQ, InputError::WARN);
+        addKey(SUMMARY_UDQ_MISSING_UNIT, InputError::WARN);
         addKey(SCHEDULE_INVALID_NAME, InputError::THROW_EXCEPTION);
 
         addKey(ACTIONX_ILLEGAL_KEYWORD, InputError::THROW_EXCEPTION);
 
         addKey(RPT_MIXED_STYLE, InputError::WARN);
         addKey(RPT_UNKNOWN_MNEMONIC, InputError::WARN);
+
+        addKey(SIMULATOR_KEYWORD_NOT_SUPPORTED, InputError::WARN);
+        addKey(SIMULATOR_KEYWORD_ITEM_NOT_SUPPORTED, InputError::WARN);
+
+        addKey(UDQ_PARSE_ERROR, InputError::THROW_EXCEPTION);
+        this->addKey(SCHEDULE_WELL_ERROR, InputError::THROW_EXCEPTION);
     }
 
     void ParseContext::initEnv() {
@@ -295,6 +311,14 @@ namespace Opm {
     const std::string ParseContext::PARSE_EXTRA_DATA = "PARSE_EXTRA_DATA";
     const std::string ParseContext::PARSE_MISSING_SECTIONS = "PARSE_MISSING_SECTIONS";
     const std::string ParseContext::PARSE_MISSING_INCLUDE = "PARSE_MISSING_INCLUDE";
+    const std::string ParseContext::PARSE_LONG_KEYWORD = "PARSE_LONG_KEYWORD";
+
+    const std::string ParseContext::UNIT_SYSTEM_MISMATCH = "UNIT_SYSTEM_MISMATCH";
+
+    const std::string ParseContext::RUNSPEC_NUMWELLS_TOO_LARGE = "RUNSPEC_NUMWELLS_TOO_LARGE";
+    const std::string ParseContext::RUNSPEC_CONNS_PER_WELL_TOO_LARGE = "RUNSPEC_CONNS_PER_WELL_TOO_LARGE";
+    const std::string ParseContext::RUNSPEC_NUMGROUPS_TOO_LARGE = "RUNSPEC_NUMGROUPS_TOO_LARGE";
+    const std::string ParseContext::RUNSPEC_GROUPSIZE_TOO_LARGE = "RUNSPEC_GROUPSIZE_TOO_LARGE";
 
     const std::string ParseContext::UNSUPPORTED_SCHEDULE_GEO_MODIFIER = "UNSUPPORTED_SCHEDULE_GEO_MODIFIER";
     const std::string ParseContext::UNSUPPORTED_COMPORD_TYPE = "UNSUPPORTED_COMPORD_TYPE";
@@ -306,12 +330,18 @@ namespace Opm {
     const std::string ParseContext::SUMMARY_UNKNOWN_WELL  = "SUMMARY_UNKNOWN_WELL";
     const std::string ParseContext::SUMMARY_UNKNOWN_GROUP = "SUMMARY_UNKNOWN_GROUP";
     const std::string ParseContext::SUMMARY_UNHANDLED_KEYWORD = "SUMMARY_UNHANDLED_KEYWORD";
+    const std::string ParseContext::SUMMARY_UNDEFINED_UDQ = "SUMMARY_UNDEFINED_UDQ";
+    const std::string ParseContext::SUMMARY_UDQ_MISSING_UNIT = "SUMMARY_UDQ_MISSING_UNIT";
 
     const std::string ParseContext::RPT_MIXED_STYLE = "RPT_MIXED_STYLE";
     const std::string ParseContext::RPT_UNKNOWN_MNEMONIC = "RPT_UNKNOWN_MNEMONIC";
 
     const std::string ParseContext::SCHEDULE_INVALID_NAME = "SCHEDULE_INVALID_NAME";
     const std::string ParseContext::ACTIONX_ILLEGAL_KEYWORD = "ACTIONX_ILLEGAL_KEYWORD";
+
+    const std::string ParseContext::SIMULATOR_KEYWORD_NOT_SUPPORTED = "SIMULATOR_KEYWORD_NOT_SUPPORTED";
+    const std::string ParseContext::SIMULATOR_KEYWORD_ITEM_NOT_SUPPORTED = "SIMULATOR_KEYWORD_ITEM_NOT_SUPPORTED";
+
+    const std::string ParseContext::UDQ_PARSE_ERROR = "UDQ_PARSE_ERROR";
+    const std::string ParseContext::SCHEDULE_WELL_ERROR = "SCHEDULE_WELL_ERROR";
 }
-
-

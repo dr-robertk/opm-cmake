@@ -16,31 +16,33 @@
   You should have received a copy of the GNU General Public License
   along with OPM.  If not, see <http://www.gnu.org/licenses/>.
 */
+#include <iostream>
+#include <algorithm>
+#include <array>
 
+#include <ert/ecl/ecl_smspec.hpp>
 
 #include <opm/parser/eclipse/Parser/ParseContext.hpp>
+
 #include <opm/parser/eclipse/Deck/Deck.hpp>
 #include <opm/parser/eclipse/Deck/DeckItem.hpp>
 #include <opm/parser/eclipse/Deck/DeckKeyword.hpp>
 #include <opm/parser/eclipse/Deck/DeckRecord.hpp>
 #include <opm/parser/eclipse/Deck/Section.hpp>
-#include <opm/parser/eclipse/EclipseState/Tables/TableManager.hpp>
+
 #include <opm/parser/eclipse/EclipseState/EclipseState.hpp>
+#include <opm/parser/eclipse/EclipseState/Tables/TableManager.hpp>
 #include <opm/parser/eclipse/EclipseState/Grid/EclipseGrid.hpp>
 #include <opm/parser/eclipse/EclipseState/Grid/GridDims.hpp>
-#include <opm/parser/eclipse/EclipseState/Schedule/Connection.hpp>
-#include <opm/parser/eclipse/EclipseState/Schedule/WellConnections.hpp>
+#include <opm/parser/eclipse/EclipseState/Schedule/UDQ/UDQInput.hpp>
 #include <opm/parser/eclipse/EclipseState/Schedule/Group.hpp>
 #include <opm/parser/eclipse/EclipseState/Schedule/Schedule.hpp>
 #include <opm/parser/eclipse/EclipseState/Schedule/TimeMap.hpp>
-#include <opm/parser/eclipse/EclipseState/Schedule/Well.hpp>
+#include <opm/parser/eclipse/EclipseState/Schedule/Well/Connection.hpp>
+#include <opm/parser/eclipse/EclipseState/Schedule/Well/Well.hpp>
+#include <opm/parser/eclipse/EclipseState/Schedule/Well/WellConnections.hpp>
 #include <opm/parser/eclipse/EclipseState/SummaryConfig/SummaryConfig.hpp>
 
-#include <ert/ecl/ecl_smspec.hpp>
-
-#include <iostream>
-#include <algorithm>
-#include <array>
 
 namespace Opm {
 
@@ -57,14 +59,16 @@ namespace {
         "FGIR",  "FGIT",  "FGOR", "FGPR",  "FGPT", "FOIP",  "FOIPG",
         "FOIPL", "FOIR",  "FOIT", "FOPR",  "FOPT", "FPR",   "FVIR",
         "FVIT",  "FVPR",  "FVPT", "FWCT",  "FWGR", "FWIP",  "FWIR",
-        "FWIT",  "FWPR",  "FWPT",
+        "FWIT",  "FWPR",  "FWPT", "FWPP",  "FOPP", "FGPP",  "FWPI",
+	"FOPI",  "FGPI",
         "GGIR",  "GGIT",  "GGOR", "GGPR",  "GGPT", "GOIR",  "GOIT",
         "GOPR",  "GOPT",  "GVIR", "GVIT",  "GVPR", "GVPT",  "GWCT",
-        "GWGR",  "GWIR",  "GWIT", "GWPR",  "GWPT",
+        "GWGR",  "GWIR",  "GWIT", "GWPR",  "GWPT", "GWPP",  "GOPP",
+	"GGPP",  "GWPI",  "GOPI", "GGPI",
         "WBHP",  "WGIR",  "WGIT", "WGOR",  "WGPR", "WGPT",  "WOIR",
         "WOIT",  "WOPR",  "WOPT", "WPI",   "WTHP", "WVIR",  "WVIT",
         "WVPR",  "WVPT",  "WWCT", "WWGR",  "WWIR", "WWIT",  "WWPR",
-        "WWPT",
+        "WWPT",  "WWPP",  "WOPP", "WGPP",  "WWPI", "WGPI",  "WOPI",
         // ALL will not expand to these keywords yet
         "AAQR",  "AAQRG", "AAQT", "AAQTG"
     };
@@ -121,6 +125,9 @@ namespace {
          {"SGAS" , {"BSGAS"}}
     };
 
+    bool is_udq(const std::string& keyword) {
+        return (keyword.size() > 1 && keyword[1] == 'U');
+    }
 
 
 void handleMissingWell( const ParseContext& parseContext, ErrorGuard& errors, const std::string& keyword, const std::string& well) {
@@ -150,19 +157,25 @@ inline void keywordW( SummaryConfig::keyword_list& list,
         return kw.getDataRecord().getDataItem().hasValue( 0 );
     };
 
+    if (keyword.name().back() == 'L') {
+        std::string msg = std::string("The completion keywords like: " + keyword.name() + " are not supported");
+        parseContext.handleError( ParseContext::SUMMARY_UNHANDLED_KEYWORD, msg, errors);
+        return;
+    }
+
     if (keyword.size() && hasValue(keyword)) {
         for( const std::string& pattern : keyword.getStringData()) {
-            auto wells = schedule.getWellsMatching( pattern );
+          auto well_names = schedule.wellNames( pattern, schedule.size() - 1 );
 
-            if( wells.empty() )
+            if( well_names.empty() )
                 handleMissingWell( parseContext, errors, keyword.name(), pattern );
 
-            for( const auto* well : wells )
-                list.push_back( SummaryConfig::keyword_type( keyword.name(), well->name() ));
+            for( const auto& well_name : well_names)
+                list.push_back( SummaryConfig::keyword_type( keyword.name(), well_name ));
         }
     } else
-        for (const auto* well : schedule.getWells())
-            list.push_back( SummaryConfig::keyword_type( keyword.name(),  well->name()));
+        for (const auto& wname : schedule.wellNames())
+            list.push_back( SummaryConfig::keyword_type( keyword.name(),  wname));
   }
 
 
@@ -287,16 +300,15 @@ inline void keywordMISC( SummaryConfig::keyword_list& list,
 
         const auto& wellitem = record.getItem( 0 );
 
-        const auto wells = wellitem.defaultApplied( 0 )
-                         ? schedule.getWells()
-                         : schedule.getWellsMatching( wellitem.getTrimmedString( 0 ) );
+        const auto well_names = wellitem.defaultApplied( 0 )
+                              ? schedule.wellNames()
+                              : schedule.wellNames( wellitem.getTrimmedString( 0 ) );
 
-        if( wells.empty() )
+        if( well_names.empty() )
             handleMissingWell( parseContext, errors, keyword.name(), wellitem.getTrimmedString( 0 ) );
 
-        for( const auto* well : wells ) {
-            const auto& name = well->name();
-
+        for(const auto& name : well_names) {
+            const auto* well = schedule.getWell(name);
             /*
              * we don't want to add completions that don't exist, so we iterate
              * over a well's completions regardless of the desired block is
@@ -382,7 +394,7 @@ inline void keywordMISC( SummaryConfig::keyword_list& list,
     void makeSegmentNodes(const std::size_t               last_timestep,
                           const int                       segID,
                           const DeckKeyword&              keyword,
-                          const std::vector<const Well*>& wells,
+                          const Well*                     well,
                           SummaryConfig::keyword_list&    list)
     {
         // Modifies 'list' in place.
@@ -392,30 +404,27 @@ inline void keywordMISC( SummaryConfig::keyword_list& list,
             list.push_back(SummaryConfig::keyword_type( keyword.name(), well, segNumber ));
         };
 
-        for (const auto* well : wells) {
-            if (! isMultiSegmentWell(last_timestep, well)) {
-                // Not an MSW.  Don't create summary vectors for segments.
-                continue;
-            }
+        if (! isMultiSegmentWell(last_timestep, well))
+            // Not an MSW.  Don't create summary vectors for segments.
+            return;
 
-            const auto& wname = well->name();
-            if (segID < 1) {
-                // Segment number defaulted.  Allocate a summary
-                // vector for each segment.
-                const auto nSeg = maxNumWellSegments(last_timestep, well);
+        const auto& wname = well->name();
+        if (segID < 1) {
+            // Segment number defaulted.  Allocate a summary
+            // vector for each segment.
+            const auto nSeg = maxNumWellSegments(last_timestep, well);
 
-                for (auto segNumber = 0*nSeg;
-                          segNumber <   nSeg; ++segNumber)
+            for (auto segNumber = 0*nSeg;
+                 segNumber <   nSeg; ++segNumber)
                 {
                     // One-based segment number.
                     makeNode(wname, segNumber + 1);
                 }
-            }
-            else {
-                // Segment number specified.  Allocate single
-                // summary vector for that segment number.
-                makeNode(wname, segID);
-            }
+        }
+        else {
+            // Segment number specified.  Allocate single
+            // summary vector for that segment number.
+            makeNode(wname, segID);
         }
     }
 
@@ -434,8 +443,9 @@ inline void keywordMISC( SummaryConfig::keyword_list& list,
 
         const auto segID = -1;
 
-        makeSegmentNodes(last_timestep, segID, keyword,
-                         schedule.getWells(), list);
+        for (const auto& well : schedule.getWells())
+            makeSegmentNodes(last_timestep, segID, keyword,
+                             well, list);
     }
 
     void keywordSWithRecords(const std::size_t            last_timestep,
@@ -463,21 +473,21 @@ inline void keywordMISC( SummaryConfig::keyword_list& list,
 
         for (const auto& record : keyword) {
             const auto& wellitem = record.getItem(0);
-            const auto& wells    = wellitem.defaultApplied(0)
-                ? schedule.getWells()
-                : schedule.getWellsMatching(wellitem.getTrimmedString(0));
+            const auto& well_names = wellitem.defaultApplied(0)
+                ? schedule.wellNames()
+                : schedule.wellNames(wellitem.getTrimmedString(0));
 
-            if (wells.empty()) {
+            if (well_names.empty())
                 handleMissingWell(parseContext, errors, keyword.name(),
                                   wellitem.getTrimmedString(0));
-            }
 
             // Negative 1 (< 0) if segment ID defaulted.  Defaulted
             // segment number in record implies all segments.
             const auto segID = record.getItem(1).defaultApplied(0)
                 ? -1 : record.getItem(1).get<int>(0);
 
-            makeSegmentNodes(last_timestep, segID, keyword, wells, list);
+            for (const auto& well_name : well_names)
+                makeSegmentNodes(last_timestep, segID, keyword, schedule.getWell(well_name), list);
         }
     }
 
@@ -531,6 +541,21 @@ inline void keywordMISC( SummaryConfig::keyword_list& list,
                         ErrorGuard& errors,
                         const GridDims& dims) {
     const auto var_type = ecl_smspec_identify_var_type( keyword.name().c_str() );
+    const auto& name = keyword.name();
+    if (is_udq(name)) {
+        const auto& udq = schedule.getUDQConfig(schedule.size() - 1);
+
+        if (!udq.has_keyword(name)) {
+            std::string msg{"Summary output has been requested for UDQ keyword: " + name + " but it has not been configured"};
+            parseContext.handleError(ParseContext::SUMMARY_UNDEFINED_UDQ, msg, errors);
+            return;
+        }
+
+        if (!udq.has_unit(name)) {
+            std::string msg{"Summary output has been requested for UDQ keyword: " + name + " but no unit has not been configured"};
+            parseContext.handleError(ParseContext::SUMMARY_UDQ_MISSING_UNIT, msg, errors);
+        }
+    }
 
     switch( var_type ) {
         case ECL_SMSPEC_WELL_VAR: return keywordW( list, parseContext, errors, keyword, schedule );
@@ -574,8 +599,16 @@ SummaryConfig::SummaryConfig( const Deck& deck,
                               ErrorGuard& errors,
                               const GridDims& dims) {
     SUMMARYSection section( deck );
-    for( auto& x : section )
-        handleKW( this->keywords, x, schedule, tables, parseContext, errors, dims);
+
+    // The kw_iter++ hoops is to skip the initial 'SUMMARY' keyword.
+    auto kw_iter = section.begin();
+    if (kw_iter != section.end())
+        kw_iter++;
+
+    for(; kw_iter != section.end(); ++kw_iter) {
+        const auto& kw = *kw_iter;
+        handleKW( this->keywords, kw, schedule, tables, parseContext, errors, dims);
+    }
 
     if( section.hasKeyword( "ALL" ) )
         this->merge( { ALL_keywords, schedule, tables, parseContext, errors, dims} );
@@ -661,6 +694,10 @@ bool SummaryConfig::hasSummaryKey(const std::string& keyword ) const {
     return (this->summary_keywords.count( keyword ) == 1);
 }
 
+
+size_t SummaryConfig::size() const {
+    return this->keywords.size();
+}
 
 /*
   Can be used to query if a certain 3D field, e.g. PRESSURE, is

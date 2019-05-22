@@ -49,6 +49,7 @@ const std::string testHeader =
     "auto unitSystem =  UnitSystem::newMETRIC();\n";
 
 const std::string sourceHeader =
+    "#include <opm/parser/eclipse/Deck/UDAValue.hpp>\n"
     "#include <opm/parser/eclipse/Parser/ParserKeyword.hpp>\n"
     "#include <opm/parser/eclipse/Parser/ParserItem.hpp>\n"
     "#include <opm/parser/eclipse/Parser/ParserRecord.hpp>\n"
@@ -124,7 +125,7 @@ namespace Opm {
         newSource << "}" << std::endl;
 
         newSource << "void Parser::addDefaultKeywords() {" << std::endl
-                  << "Opm::ParserKeywords::addDefaultKeywords(*this);" << std::endl
+                  << "  Opm::ParserKeywords::addDefaultKeywords(*this);" << std::endl
                   << "}}" << std::endl;
 
         return write_file( newSource, sourceFile, m_verbose, "source" );
@@ -196,7 +197,7 @@ namespace Opm {
             stream << "    BOOST_CHECK_EQUAL( jsonKeyword, inlineKeyword );" << std::endl;
             stream << "    if (jsonKeyword.hasDimension()) {" <<std::endl;
             stream << "        const auto& parserRecord = jsonKeyword.getRecord(0);" << std::endl;
-            stream << "        for (size_t i=0; i < parserRecord.size(); i++){ " << std::endl;
+            stream << "        for (size_t i=0; i < parserRecord.size(); i++){" << std::endl;
             stream << "            const auto& item = parserRecord.get( i );" << std::endl;
             stream << "            for (size_t j=0; j < item.numDimensions(); j++) {" << std::endl;
             stream << "                const std::string& dimString = item.getDimension(j);" << std::endl;
