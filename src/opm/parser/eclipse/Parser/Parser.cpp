@@ -20,6 +20,7 @@
 #include <cctype>
 #include <fstream>
 #include <memory>
+#include <stack>
 
 #include <boost/algorithm/string.hpp>
 #include <boost/filesystem.hpp>
@@ -382,10 +383,10 @@ void ParserState::handleRandomText(const string_view& keywordString ) const {
     }
     else if (lastSizeType == OTHER_KEYWORD_IN_DECK) {
       errorKey = ParseContext::PARSE_EXTRA_RECORDS;
-      msg << "String: \'" 
+      msg << "String: \'"
           << keywordString
           << "\' invalid."
-          << "Too many records in keyword: " 
+          << "Too many records in keyword: "
           << lastKeyWord
           << " at: "
           << this->line()
